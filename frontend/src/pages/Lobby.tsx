@@ -160,6 +160,11 @@ export default function Lobby() {
         </motion.div>
 
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+          <div className="flex flex-col">
+            {/* invisible spacer — same height as the tab row on the right so card tops align */}
+            <div className="-mb-px hidden gap-1.5 pl-2 lg:flex" aria-hidden>
+              <span className="inline-flex items-center px-4 py-2 text-xs">&nbsp;</span>
+            </div>
           <motion.section
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -203,6 +208,7 @@ export default function Lobby() {
               )}
             </div>
           </motion.section>
+          </div>
 
           <div className="flex flex-col">
             <div
