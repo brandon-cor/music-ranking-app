@@ -37,9 +37,7 @@ export function VoteCelebration({ score, onDone }: VoteCelebrationProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className={`fixed inset-0 z-[130] flex items-center justify-center px-6 ${
-          isBad ? 'bg-black/92' : 'bg-background/88 backdrop-blur-md'
-        }`}
+        className="fixed inset-0 z-[130] flex items-center justify-center px-6 bg-background/88 backdrop-blur-md"
         aria-live="polite"
       >
         {isFire && (
