@@ -32,7 +32,10 @@ cd backend && npx prisma migrate deploy && npx prisma generate && cd ..
 # 4. Make the start script executable (only needed once after a fresh clone)
 chmod +x start.sh
 
-# 5. Start both servers (backend :3000, frontend :5173)
+# 5. Free up ports if needed (run if you see EADDRINUSE errors)
+lsof -ti :3000,:5173 | xargs kill -9 2>/dev/null; true
+
+# 6. Start both servers (backend :3000, frontend :5173)
 ./start.sh
 ```
 
