@@ -358,22 +358,26 @@ export default function Player() {
             </p>
           )}
 
-          <div className="grid min-h-0 gap-6 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(180px,240px)] lg:items-stretch lg:min-h-[min(560px,calc(100vh-12rem))]">
-            <div className="flex min-h-0 flex-col gap-6">
-              <section className="min-w-0">
-                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
+          <div className="grid min-h-0 gap-6 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(180px,240px)] lg:items-stretch lg:h-[min(560px,calc(100vh-12rem))]">
+            <div className="flex min-h-0 flex-col gap-4 lg:h-full lg:overflow-hidden">
+              <section className="flex min-h-0 shrink-0 flex-col" style={{ maxHeight: '35%' }}>
+                <h2 className="mb-3 shrink-0 text-sm font-bold uppercase tracking-wide text-muted">
                   In the room ({users.length})
                 </h2>
-                <UserList
-                  users={users}
-                  hostId={party.host_id}
-                  currentUserId={currentUser?.id ?? null}
-                  votedUserIds={displayedVotedUserIds}
-                />
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  <UserList
+                    users={users}
+                    hostId={party.host_id}
+                    currentUserId={currentUser?.id ?? null}
+                    votedUserIds={displayedVotedUserIds}
+                  />
+                </div>
               </section>
-              <section className="min-w-0">
-                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
-                <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
+              <section className="flex min-h-0 flex-1 flex-col">
+                <h2 className="mb-3 shrink-0 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
+                </div>
               </section>
             </div>
 
