@@ -140,32 +140,23 @@ export default function Lobby() {
           transition={{ delay: 0.1 }}
           className="rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
         >
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Spotify (Premium)</h2>
           {currentUser?.spotify_connected ? (
             <p className="text-sm font-semibold text-success">
               You&apos;re connected — you can search, preview clips, and join playback when the party goes live.
             </p>
           ) : (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-muted">
-                Connect your own Spotify Premium account. Everyone in the room must connect before the host can start.
-              </p>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted">Connect your Spotify Premium.</p>
               <a
                 href={spotifyAuthUrl}
                 className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#1ed760]"
               >
                 <SpotifyIcon /> Connect Spotify
               </a>
+              <p className="text-sm text-muted">
+                Everyone in the room must connect before the host can start.
+              </p>
             </div>
-          )}
-          {!allSpotifyReady && users.length > 0 && (
-            <p className="mt-3 text-xs text-muted">
-              Waiting for Spotify:{' '}
-              {users
-                .filter((u) => !u.spotify_connected)
-                .map((u) => u.name)
-                .join(', ') || '—'}
-            </p>
           )}
         </motion.section>
 
