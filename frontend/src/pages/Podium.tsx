@@ -7,7 +7,6 @@ import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { getResults } from '../lib/api';
 import { playDrumRoll, playVerdictReveal } from '../lib/audio';
-import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import type { SongResult } from '../types';
 
 type RevealPhase = 'idle' | 'drum_roll' | 'revealed';
@@ -228,7 +227,6 @@ export default function Podium() {
           <h1 className="display-num text-[clamp(40px,10vw,80px)] leading-none text-white">
             THE VERDICT
           </h1>
-          {partyId && <PartyCodeEditor partyCode={partyId} className="mt-4 justify-center" />}
         </motion.div>
 
         {phase === 'idle' && (
