@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 export interface CircleCountdownProps {
   endsAt: number;
   durationMs: number;
+  /** When set, countdown is frozen at this remaining ms (no animation loop). */
+  pausedRemainingMs?: number | null;
   size?: number;
   onExpire?: () => void;
 }
@@ -30,6 +32,7 @@ function ringColor(remainingFraction: number): string {
 export function CircleCountdown({
   endsAt,
   durationMs,
+  pausedRemainingMs = null,
   size = 144,
   onExpire,
 }: CircleCountdownProps) {
@@ -49,11 +52,18 @@ export function CircleCountdown({
   const firedExpireRef = useRef(false);
 
   useEffect(() => {
+    if (pausedRemainingMs != null) {
+      setMsLeft(Math.max(0, Math.min(durationMs, pausedRemainingMs)));
+      return;
+    }
     firedExpireRef.current = false;
     setMsLeft(Math.max(0, Math.min(durationMs, endsAt - Date.now())));
-  }, [endsAt, durationMs]);
+  }, [endsAt, durationMs, pausedRemainingMs]);
 
   useEffect(() => {
+    if (pausedRemainingMs != null) {
+      return undefined;
+    }
     let frameId = 0;
     const tick = () => {
       const left = Math.max(0, endsAt - Date.now());
@@ -66,12 +76,13 @@ export function CircleCountdown({
     };
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, [endsAt]);
+  }, [endsAt, pausedRemainingMs]);
 
   const remainingFraction = durationMs > 0 ? Math.min(1, msLeft / durationMs) : 0;
   const dashOffset = circumference * (1 - remainingFraction);
   const color = ringColor(remainingFraction);
-  const isUrgent = remainingFraction <= 0.1 && msLeft > 0;
+  const isUrgent =
+    pausedRemainingMs == null && remainingFraction <= 0.1 && msLeft > 0;
   const secondsCeil = Math.ceil(msLeft / 1000);
 
   return (

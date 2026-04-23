@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -24,6 +25,8 @@ interface PartyContextValue {
   songs: Song[];
   currentSong: Song | null;
   ratingWindow: RatingWindowState | null;
+  /** When non-null, rating timer is frozen at this many ms left (host paused playback). */
+  ratingPausedRemainingMs: number | null;
   hasVoted: boolean;
   voteCount: number;
   /** User ids who submitted a rating for the current song (from server tally). */
@@ -38,6 +41,8 @@ interface PartyContextValue {
   emitRatingOpen: (songId: string) => void;
   emitRatingSubmit: (songId: string, score: number) => void;
   emitSongSkip: () => void;
+  emitSongPause: () => void;
+  emitSongResume: () => void;
   emitPartyEnd: () => void;
   addSongToList: (song: Song) => void;
   leaveParty: (reasonKey?: string) => void;
@@ -58,6 +63,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [ratingWindow, setRatingWindow] = useState<RatingWindowState | null>(null);
+  const [ratingPausedRemainingMs, setRatingPausedRemainingMs] = useState<number | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [voteCount, setVoteCount] = useState(0);
   const [votedUserIds, setVotedUserIds] = useState<string[]>([]);
@@ -90,6 +96,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     setSongs([]);
     setCurrentSong(null);
     setRatingWindow(null);
+    setRatingPausedRemainingMs(null);
     setHasVoted(false);
     setVoteCount(0);
     setVotedUserIds([]);
@@ -114,6 +121,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     setHasVoted(false);
     setVoteCount(0);
     setVotedUserIds([]);
+    setRatingPausedRemainingMs(null);
     socket.emit('rating:open', { songId });
   }
 
@@ -124,6 +132,14 @@ export function PartyProvider({ children }: { children: ReactNode }) {
   function emitSongSkip() {
     socket.emit('song:skip');
   }
+
+  const emitSongPause = useCallback(() => {
+    socket.emit('song:pause');
+  }, [socket]);
+
+  const emitSongResume = useCallback(() => {
+    socket.emit('song:resume');
+  }, [socket]);
 
   function emitPartyEnd() {
     socket.emit('party:end');
@@ -182,6 +198,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     socket.on('song:play', ({ song }: { song: Song }) => {
       setCurrentSong(song);
       setRatingWindow(null);
+      setRatingPausedRemainingMs(null);
       setHasVoted(false);
       setVoteCount(0);
       setVotedUserIds([]);
@@ -191,9 +208,33 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       'rating:open',
       ({ songId, endsAt, duration }: { songId: string; endsAt: number; duration: number }) => {
         setRatingWindow({ songId, endsAt, duration });
+        setRatingPausedRemainingMs(null);
         setHasVoted(false);
         setVoteCount(0);
         setVotedUserIds([]);
+      },
+    );
+
+    socket.on(
+      'rating:pause',
+      ({ remainingMs }: { songId: string; remainingMs: number }) => {
+        setRatingPausedRemainingMs(Math.max(0, remainingMs));
+      },
+    );
+
+    socket.on(
+      'rating:resume',
+      ({
+        songId,
+        endsAt,
+        durationMs,
+      }: {
+        songId: string;
+        endsAt: number;
+        durationMs: number;
+      }) => {
+        setRatingWindow({ songId, endsAt, duration: durationMs / 1000 });
+        setRatingPausedRemainingMs(null);
       },
     );
 
@@ -217,12 +258,14 @@ export function PartyProvider({ children }: { children: ReactNode }) {
 
     socket.on('rating:close', () => {
       setRatingWindow(null);
+      setRatingPausedRemainingMs(null);
       setVotedUserIds([]);
     });
 
     socket.on('party:end', ({ results: r }: { results: SongResult[] }) => {
       setResults(r);
       setRatingWindow(null);
+      setRatingPausedRemainingMs(null);
       setVotedUserIds([]);
       setPartyState((prev) => (prev ? { ...prev, status: 'ended' } : prev));
       // navigate everyone to the podium
@@ -246,6 +289,8 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       socket.off('user:updated');
       socket.off('song:play');
       socket.off('rating:open');
+      socket.off('rating:pause');
+      socket.off('rating:resume');
       socket.off('rating:confirmed');
       socket.off('rating:tally');
       socket.off('rating:close');
@@ -264,6 +309,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     songs,
     currentSong,
     ratingWindow,
+    ratingPausedRemainingMs,
     hasVoted,
     voteCount,
     votedUserIds,
@@ -276,6 +322,8 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     emitRatingOpen,
     emitRatingSubmit,
     emitSongSkip,
+    emitSongPause,
+    emitSongResume,
     emitPartyEnd,
     addSongToList,
     leaveParty,

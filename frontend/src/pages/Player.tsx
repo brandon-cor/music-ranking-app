@@ -35,6 +35,9 @@ export default function Player() {
     emitSongPlay,
     emitRatingSubmit,
     emitSongSkip,
+    emitSongPause,
+    emitSongResume,
+    ratingPausedRemainingMs,
     emitPartyEnd,
     leaveParty,
   } = useParty();
@@ -220,6 +223,14 @@ export default function Player() {
     setCelebrationScore(null);
   }, []);
 
+  const onRatingPlaybackTransition = useCallback(
+    (paused: boolean) => {
+      if (paused) emitSongPause();
+      else emitSongResume();
+    },
+    [emitSongPause, emitSongResume],
+  );
+
   useEffect(() => {
     const justClosed = wasRatingOpenRef.current && ratingWindow === null;
     wasRatingOpenRef.current = ratingWindow !== null;
@@ -321,6 +332,7 @@ export default function Player() {
                   <CircleCountdown
                     endsAt={ratingWindow.endsAt}
                     durationMs={ratingWindow.duration * 1000}
+                    pausedRemainingMs={ratingPausedRemainingMs}
                     size={104}
                   />
                 )}
@@ -362,6 +374,8 @@ export default function Player() {
                 onSkipRating={isHost ? emitSongSkip : undefined}
                 showSkip={!!ratingWindow}
                 fillHeight
+                trackRatingPause={isHost && !!ratingWindow}
+                onRatingPlaybackTransition={isHost ? onRatingPlaybackTransition : undefined}
               />
             </div>
 

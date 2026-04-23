@@ -1,5 +1,5 @@
 // iPod shuffle–style host playback chrome: track info, album art, progress, play/pause
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Song, SpotifyPlayer } from '../types';
 
 /** Minimal shape returned by Spotify Web Playback SDK getCurrentState() */
@@ -38,6 +38,9 @@ export interface IPodPlayerProps {
   showSkip?: boolean;
   /** Stretch to parent height and grow the art area (live Player middle column). */
   fillHeight?: boolean;
+  /** While a rating window is open, report Spotify pause/play edges (host syncs server timer). */
+  trackRatingPause?: boolean;
+  onRatingPlaybackTransition?: (paused: boolean) => void;
 }
 
 export function IPodPlayer({
@@ -48,10 +51,13 @@ export function IPodPlayer({
   onSkipRating,
   showSkip = false,
   fillHeight = false,
+  trackRatingPause = false,
+  onRatingPlaybackTransition,
 }: IPodPlayerProps) {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(true);
+  const lastPausedForRatingRef = useRef<boolean | null>(null);
 
   const refresh = useCallback(async () => {
     if (!player || !isHost) {
@@ -78,10 +84,28 @@ export function IPodPlayer({
   }, [refresh, song?.id]);
 
   useEffect(() => {
+    if (!trackRatingPause) {
+      lastPausedForRatingRef.current = null;
+    }
+  }, [trackRatingPause]);
+
+  useEffect(() => {
     if (!player || !isHost) return;
 
-    const onState = () => {
+    const onState = (raw: unknown) => {
       void refresh();
+      if (trackRatingPause && onRatingPlaybackTransition) {
+        const parsed = parseState(raw);
+        if (!parsed) return;
+        const p = parsed.paused;
+        if (lastPausedForRatingRef.current === null) {
+          lastPausedForRatingRef.current = p;
+          return;
+        }
+        if (p === lastPausedForRatingRef.current) return;
+        lastPausedForRatingRef.current = p;
+        onRatingPlaybackTransition(p);
+      }
     };
     player.addListener('player_state_changed', onState);
     const id = window.setInterval(() => {
@@ -92,7 +116,7 @@ export function IPodPlayer({
       clearInterval(id);
       player.removeListener('player_state_changed');
     };
-  }, [player, isHost, refresh]);
+  }, [player, isHost, refresh, trackRatingPause, onRatingPlaybackTransition]);
 
   const showProgress = isHost && duration > 0;
   const progressPct = showProgress ? Math.min(100, (position / duration) * 100) : 0;

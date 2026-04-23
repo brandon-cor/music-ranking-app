@@ -2,8 +2,26 @@ import { Server, Socket } from 'socket.io';
 import { prisma } from '../lib/prisma';
 import { toSafeParty, toSafeUser } from '../lib/serialize';
 
+interface ActiveRatingTimer {
+  timer: ReturnType<typeof setTimeout>;
+  songId: string;
+  endsAt: number;
+  /** Full-window duration in ms (for client ring math). */
+  durationMs: number;
+  showScores: boolean;
+}
+
+interface PausedRating {
+  songId: string;
+  remainingMs: number;
+  durationMs: number;
+  showScores: boolean;
+}
+
 // one timer per party — tracks the active rating window
-const ratingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const ratingTimers = new Map<string, ActiveRatingTimer>();
+// host paused playback: timer cleared, remaining time stored until resume
+const pausedRatings = new Map<string, PausedRating>();
 // prevents duplicate rating:close when the last two votes land in the same tick
 const ratingFinalizedKeys = new Set<string>();
 
@@ -14,8 +32,12 @@ const hostGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function clearRatingTimer(partyId: string) {
   const existing = ratingTimers.get(partyId);
-  if (existing) clearTimeout(existing);
+  if (existing) clearTimeout(existing.timer);
   ratingTimers.delete(partyId);
+}
+
+function clearPausedRating(partyId: string) {
+  pausedRatings.delete(partyId);
 }
 
 /** Opens the rating window and starts the server-side timer for this song. */
@@ -28,6 +50,7 @@ function openRatingWindow(
 ) {
   ratingFinalizedKeys.delete(`${partyId}:${songId}`);
   clearRatingTimer(partyId);
+  clearPausedRating(partyId);
 
   const durationMs = durationSec * 1000;
   const endsAt = Date.now() + durationMs;
@@ -42,7 +65,7 @@ function openRatingWindow(
     void finalizeRatingWindow(io, partyId, songId, showScores);
   }, durationMs);
 
-  ratingTimers.set(partyId, timer);
+  ratingTimers.set(partyId, { timer, songId, endsAt, durationMs, showScores });
 }
 
 /** Ends the rating window for one song: clears timer, emits rating:close once per song. */
@@ -56,6 +79,7 @@ async function finalizeRatingWindow(
   if (ratingFinalizedKeys.has(dedupeKey)) return;
   ratingFinalizedKeys.add(dedupeKey);
   clearRatingTimer(partyId);
+  clearPausedRating(partyId);
 
   let scores: { songId: string; avgScore: number; voteCount: number } | null = null;
   if (showScores) {
@@ -185,12 +209,73 @@ export function setupSocket(io: Server) {
       );
     });
 
+    // song:pause — host paused Spotify during rating; freeze server timer + broadcast
+    socket.on('song:pause', async () => {
+      const { partyId, userId } = socket.data as { partyId: string; userId: string };
+      if (!partyId || !userId) return;
+
+      const active = ratingTimers.get(partyId);
+      if (!active) return;
+
+      const party = await prisma.party.findUnique({ where: { id: partyId } });
+      if (!party || party.host_id !== userId) return;
+
+      const remainingMs = Math.max(0, active.endsAt - Date.now());
+      clearTimeout(active.timer);
+      ratingTimers.delete(partyId);
+
+      pausedRatings.set(partyId, {
+        songId: active.songId,
+        remainingMs,
+        durationMs: active.durationMs,
+        showScores: active.showScores,
+      });
+
+      io.to(`party:${partyId}`).emit('rating:pause', {
+        songId: active.songId,
+        remainingMs,
+      });
+    });
+
+    // song:resume — host resumed playback; restart timer from remaining ms
+    socket.on('song:resume', async () => {
+      const { partyId, userId } = socket.data as { partyId: string; userId: string };
+      if (!partyId || !userId) return;
+
+      const paused = pausedRatings.get(partyId);
+      if (!paused) return;
+
+      const party = await prisma.party.findUnique({ where: { id: partyId } });
+      if (!party || party.host_id !== userId) return;
+
+      const { songId, remainingMs, durationMs, showScores } = paused;
+      pausedRatings.delete(partyId);
+
+      if (remainingMs <= 0) {
+        await finalizeRatingWindow(io, partyId, songId, showScores);
+        return;
+      }
+
+      const endsAt = Date.now() + remainingMs;
+      const timer = setTimeout(() => {
+        void finalizeRatingWindow(io, partyId, songId, showScores);
+      }, remainingMs);
+
+      ratingTimers.set(partyId, { timer, songId, endsAt, durationMs, showScores });
+
+      io.to(`party:${partyId}`).emit('rating:resume', {
+        songId,
+        endsAt,
+        durationMs,
+      });
+    });
+
     // song:skip — host ends the rating window early (same payload as timer close)
     socket.on('song:skip', async () => {
       const { partyId, userId } = socket.data as { partyId: string; userId: string };
       if (!partyId || !userId) return;
 
-      if (!ratingTimers.has(partyId)) return;
+      if (!ratingTimers.has(partyId) && !pausedRatings.has(partyId)) return;
 
       const party = await prisma.party.findUnique({ where: { id: partyId } });
       if (!party || party.host_id !== userId) return;
@@ -258,12 +343,8 @@ export function setupSocket(io: Server) {
       });
       if (!party || party.host_id !== userId) return;
 
-      // clear any active timer
-      const timer = ratingTimers.get(partyId);
-      if (timer) {
-        clearTimeout(timer);
-        ratingTimers.delete(partyId);
-      }
+      clearRatingTimer(partyId);
+      clearPausedRating(partyId);
 
       await prisma.party.update({ where: { id: partyId }, data: { status: 'ended' } });
 
@@ -301,12 +382,8 @@ export function setupSocket(io: Server) {
           const hostBack = stillEmpty.some((s) => s.data?.userId === userId);
           if (hostBack) return;
 
-          // clean up rating timer if one was running
-          const ratingTimer = ratingTimers.get(partyId);
-          if (ratingTimer) {
-            clearTimeout(ratingTimer);
-            ratingTimers.delete(partyId);
-          }
+          clearRatingTimer(partyId);
+          clearPausedRating(partyId);
 
           await prisma.party.update({
             where: { id: partyId },
