@@ -232,6 +232,19 @@ export default function Home() {
   );
 }
 
+/** Circular looping arrows — randomize field (heroicons arrow-path style) */
+function RandomizeIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+      />
+    </svg>
+  );
+}
+
 function Field({
   label,
   value,
@@ -247,25 +260,27 @@ function Field({
 }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <label className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</label>
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 rounded-xl border border-border/60 bg-background/80 px-4 py-3 text-sm text-white shadow-inner placeholder:text-foreground/35 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
+        />
         {onShuffle && (
           <button
             type="button"
             onClick={onShuffle}
-            className="shrink-0 text-xs font-semibold uppercase tracking-wide text-accent transition hover:text-accent/80 focus:outline-none focus:ring-2 focus:ring-accent/30 rounded"
+            aria-label="Randomize"
+            title="Randomize"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted transition hover:border-accent/40 hover:text-accent focus:outline-none focus:ring-2 focus:ring-accent/30 active:scale-95"
           >
-            Shuffle
+            <RandomizeIcon />
           </button>
         )}
       </div>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-border/60 bg-background/80 px-4 py-3 text-sm text-white shadow-inner placeholder:text-foreground/35 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
-      />
     </div>
   );
 }
