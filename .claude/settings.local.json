@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(cp .env.example .env)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(echo \"Frontend PID: $!\")",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -X POST http://localhost:3000/api/parties -H 'Content-Type: application/json' -d '{\"name\":\"Test Party\",\"hostName\":\"DJ Test\",\"rating_window_seconds\":30,\"max_songs\":10}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(chmod +x /Users/brandon/nero-party/start.sh)"
+    ]
+  }
+}

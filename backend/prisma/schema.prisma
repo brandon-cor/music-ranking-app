@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Party {
+  id                    String   @id @default(cuid())
+  name                  String
+  status                String   @default("lobby") // lobby | playing | ended
+  rating_window_seconds Int      @default(30)
+  max_songs             Int      @default(20)
+  show_scores           Boolean  @default(false)
+  host_id               String?
+  current_song_id       String?
+  spotify_access_token  String?
+  spotify_refresh_token String?
+  songs                 Song[]
+  users                 User[]
+  createdAt             DateTime @default(now())
+}
+
+model User {
+  id       String   @id @default(cuid())
+  name     String
+  party_id String
+  party    Party    @relation(fields: [party_id], references: [id])
+  ratings  Rating[]
+}
+
+model Song {
+  id         String   @id @default(cuid())
+  party_id   String
+  spotify_id String
+  title      String
+  artist     String
+  cover_url  String
+  added_by   String
+  order      Int
+  party      Party    @relation(fields: [party_id], references: [id])
+  ratings    Rating[]
+}
+
+model Rating {
+  id       String   @id @default(cuid())
+  song_id  String
+  user_id  String
+  score    Int
+  voted_at DateTime @default(now())
+  song     Song     @relation(fields: [song_id], references: [id])
+  user     User     @relation(fields: [user_id], references: [id])
+
+  @@unique([song_id, user_id])
+}

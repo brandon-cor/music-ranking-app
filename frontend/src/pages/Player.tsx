@@ -1,0 +1,422 @@
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useParty } from '../context/PartyContext';
+import { getParty, getSpotifyToken, spotifyPlay } from '../lib/api';
+import { playRatingOpen, playVoteConfirm } from '../lib/audio';
+import NowPlaying from '../components/NowPlaying';
+import Queue from '../components/Queue';
+import UserList from '../components/UserList';
+import Countdown from '../components/Countdown';
+import RatingSlider from '../components/RatingSlider';
+import { PartyCodeEditor } from '../components/PartyCodeEditor';
+import type { SpotifyPlayer } from '../types';
+
+export default function Player() {
+  const { partyId } = useParams<{ partyId: string }>();
+  const navigate = useNavigate();
+  const {
+    party,
+    currentUser,
+    users,
+    songs,
+    currentSong,
+    ratingWindow,
+    hasVoted,
+    voteCount,
+    isHost,
+    setParty,
+    setCurrentUser,
+    joinRoom,
+    emitSongPlay,
+    emitRatingOpen,
+    emitRatingSubmit,
+    emitPartyEnd,
+  } = useParty();
+
+  // Spotify Web Playback SDK state (host only)
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [spotifyErrorMessage, setSpotifyErrorMessage] = useState<string | null>(null);
+  const playerRef = useRef<SpotifyPlayer | null>(null);
+
+  // rating slider state
+  const [sliderValue, setSliderValue] = useState(50);
+  const [votedFlash, setVotedFlash] = useState(false);
+
+  // restore session on refresh
+  useEffect(() => {
+    if (!partyId) return;
+    const restore = async () => {
+      try {
+        const fetched = await getParty(partyId);
+        setParty(fetched);
+        let user = currentUser;
+        if (!user) {
+          const stored = sessionStorage.getItem('nero_user');
+          if (stored) {
+            user = JSON.parse(stored);
+            if (user) setCurrentUser(user);
+          }
+        }
+        if (user) joinRoom(partyId, user.id);
+      } catch {
+        navigate('/');
+      }
+    };
+    if (!party) restore();
+    else if (currentUser) joinRoom(partyId, currentUser.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partyId]);
+
+  // initialize Spotify Web Playback SDK for the host
+  useEffect(() => {
+    if (!isHost || !partyId) return;
+
+    const initPlayer = async () => {
+      try {
+        const { token } = await getSpotifyToken(partyId);
+
+        const sdkReady = () => {
+          const onPlayerError = (message: string) => {
+            console.warn(message);
+            setSpotifyErrorMessage(
+              'Spotify playback is unavailable in this browser. Open the host screen in Chrome, reconnect Spotify, then try again.',
+            );
+          };
+
+          const player: SpotifyPlayer = new window.Spotify.Player({
+            name: 'Nero Party',
+            getOAuthToken: (cb) => cb(token),
+            volume: 0.8,
+          });
+
+          player.addListener('ready', (data) => {
+            const { device_id } = data as { device_id: string };
+            setDeviceId(device_id);
+            setSpotifyErrorMessage(null);
+          });
+
+          player.addListener('not_ready', () => setDeviceId(null));
+          player.addListener('initialization_error', () => onPlayerError('Spotify SDK initialization failed'));
+          player.addListener('authentication_error', () => onPlayerError('Spotify SDK authentication failed'));
+          player.addListener('account_error', () => onPlayerError('Spotify SDK account check failed'));
+          player.addListener('playback_error', () => onPlayerError('Spotify playback error'));
+
+          player.connect().then((success) => {
+            if (!success) onPlayerError('Spotify player failed to connect');
+          });
+
+          playerRef.current = player;
+        };
+
+        // SDK may already be ready if it loaded before this component mounted
+        if (window.Spotify) {
+          sdkReady();
+        } else {
+          window.onSpotifyWebPlaybackSDKReady = sdkReady;
+        }
+      } catch {
+        // no Spotify token — host hasn't connected Spotify yet
+        console.info('No Spotify token for host — skipping SDK init');
+        setSpotifyErrorMessage('Connect Spotify from the lobby before starting songs.');
+      }
+    };
+
+    initPlayer();
+
+    return () => {
+      playerRef.current?.disconnect();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHost, partyId]);
+
+  // play a sound when the rating window opens
+  useEffect(() => {
+    if (ratingWindow) {
+      playRatingOpen();
+      setSliderValue(50);
+      setVotedFlash(false);
+    }
+  }, [ratingWindow]);
+
+  const handlePlaySong = async (songId: string) => {
+    const song = songs.find((s) => s.id === songId);
+    if (!song) return;
+
+    if (!partyId || !deviceId) {
+      setSpotifyErrorMessage(
+        'Spotify player is not ready yet. Make sure the host browser supports Spotify playback and reconnect Spotify.',
+      );
+      return;
+    }
+
+    // unlock the browser audio context while we're still inside the click gesture
+    playerRef.current?.activateElement();
+
+    try {
+      await spotifyPlay(partyId, `spotify:track:${song.spotify_id}`, deviceId);
+      setSpotifyErrorMessage(null);
+      emitSongPlay(songId);
+    } catch (err) {
+      console.warn('Spotify play failed:', err);
+      setSpotifyErrorMessage(
+        'Could not start Spotify playback. Open Spotify on the host browser, then try starting the song again.',
+      );
+    }
+  };
+
+  const handleSubmitRating = () => {
+    if (!ratingWindow || hasVoted) return;
+    emitRatingSubmit(ratingWindow.songId, sliderValue);
+    setVotedFlash(true);
+    playVoteConfirm();
+  };
+
+  // which songs haven't been played yet (come after current in queue order)
+  const currentOrder = currentSong?.order ?? -1;
+  const nextSong = songs.find((s) => s.order === currentOrder + 1) ?? null;
+
+  if (!party) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <p className="text-gray-500 animate-pulse">Loading…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* rating window overlay */}
+      <AnimatePresence>
+        {ratingWindow && (
+          <RatingOverlay
+            songId={ratingWindow.songId}
+            endsAt={ratingWindow.endsAt}
+            song={songs.find((s) => s.id === ratingWindow.songId) ?? null}
+            sliderValue={sliderValue}
+            onSliderChange={setSliderValue}
+            hasVoted={hasVoted}
+            votedFlash={votedFlash}
+            voteCount={voteCount}
+            totalUsers={users.length}
+            onSubmit={handleSubmitRating}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
+        {/* header */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-gold text-xs font-bold uppercase tracking-widest">Live</p>
+            <h1 className="display-num text-3xl">{party.name}</h1>
+          </div>
+          {partyId && <PartyCodeEditor partyCode={partyId} />}
+          {isHost && (
+            <button
+              onClick={emitPartyEnd}
+              className="text-xs text-gray-600 hover:text-red-400 border border-gray-800 hover:border-red-900 px-3 py-1.5 rounded-lg transition"
+            >
+              End Party
+            </button>
+          )}
+        </div>
+
+        {/* now playing */}
+        <NowPlaying song={currentSong} />
+
+        {isHost && spotifyErrorMessage && (
+          <p className="rounded-lg border border-orange-700/40 bg-orange-900/20 px-3 py-2 text-xs text-orange-200">
+            {spotifyErrorMessage}
+          </p>
+        )}
+
+        {/* host controls */}
+        {isHost && (
+          <div className="flex flex-wrap gap-3">
+            {nextSong && !ratingWindow && (
+              <button
+                onClick={() => handlePlaySong(nextSong.id)}
+                className="bg-gold text-black font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition text-sm"
+              >
+                ▶ Play Song
+              </button>
+            )}
+
+            {currentSong && !ratingWindow && (
+              <button
+                onClick={() => emitRatingOpen(currentSong.id)}
+                className="bg-fiery text-white font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-orange-500 active:scale-95 transition text-sm"
+              >
+                🔥 Open Rating
+              </button>
+            )}
+
+            {/* play first song if nothing playing yet */}
+            {!currentSong && songs.length > 0 && !ratingWindow && (
+              <button
+                onClick={() => handlePlaySong(songs[0].id)}
+                className="bg-gold text-black font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition text-sm"
+              >
+                ▶ Play Song
+              </button>
+            )}
+
+            {deviceId ? (
+              <span className="flex items-center gap-1.5 text-xs text-success">
+                <span className="w-1.5 h-1.5 bg-success rounded-full" /> Spotify connected
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs text-gray-600">
+                <span className="w-1.5 h-1.5 bg-gray-600 rounded-full" /> Spotify not connected
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* queue */}
+        <section>
+          <h2 className="font-bold text-sm uppercase tracking-wide text-gray-400 mb-3">Queue</h2>
+          <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
+        </section>
+
+        {/* users */}
+        <section>
+          <h2 className="font-bold text-sm uppercase tracking-wide text-gray-400 mb-3">
+            In the room ({users.length})
+          </h2>
+          <UserList
+            users={users}
+            hostId={party.host_id}
+            currentUserId={currentUser?.id ?? null}
+          />
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// full-screen rating overlay
+interface RatingOverlayProps {
+  songId: string;
+  endsAt: number;
+  song: import('../types').Song | null;
+  sliderValue: number;
+  onSliderChange: (v: number) => void;
+  hasVoted: boolean;
+  votedFlash: boolean;
+  voteCount: number;
+  totalUsers: number;
+  onSubmit: () => void;
+}
+
+function RatingOverlay({
+  endsAt,
+  song,
+  sliderValue,
+  onSliderChange,
+  hasVoted,
+  votedFlash,
+  voteCount,
+  totalUsers,
+  onSubmit,
+}: RatingOverlayProps) {
+  return (
+    <motion.div
+      initial={{ y: '100%', opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: '100%', opacity: 0 }}
+      transition={{ type: 'spring', damping: 22, stiffness: 200 }}
+      className="fixed inset-0 z-50 bg-black flex flex-col"
+    >
+      {/* top: song info + countdown */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 pt-10">
+        {/* "HOT TAKE" banner */}
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, type: 'spring', damping: 15 }}
+        >
+          <h2 className="display-num text-[clamp(48px,12vw,96px)] text-gold glow-gold leading-none">
+            HOT TAKE
+          </h2>
+        </motion.div>
+
+        {/* song card */}
+        {song && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center gap-4"
+          >
+            <img
+              src={song.cover_url}
+              alt=""
+              className="w-20 h-20 rounded-xl object-cover shadow-2xl"
+            />
+            <div>
+              <p className="font-black text-xl leading-tight">{song.title}</p>
+              <p className="text-gray-400 text-sm">{song.artist}</p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* countdown */}
+        <Countdown endsAt={endsAt} />
+
+        {/* vote tally */}
+        <p className="text-gray-500 text-sm">
+          {voteCount} / {totalUsers} voted
+        </p>
+      </div>
+
+      {/* bottom: slider + submit */}
+      <div className="p-6 pb-10 border-t border-white/10 bg-black/50 backdrop-blur-sm">
+        <AnimatePresence mode="wait">
+          {votedFlash ? (
+            <motion.div
+              key="voted"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.2, opacity: 0 }}
+              className="flex flex-col items-center gap-2 py-4"
+            >
+              <span className="display-num text-6xl text-success glow-gold">
+                YOU VOTED 🔥
+              </span>
+              <span className="text-gray-400 text-sm">
+                Score: <strong className="text-white">{sliderValue}</strong> locked in
+              </span>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="slider"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col gap-5"
+            >
+              <RatingSlider
+                value={sliderValue}
+                onChange={onSliderChange}
+                disabled={hasVoted}
+              />
+
+              <button
+                onClick={onSubmit}
+                disabled={hasVoted}
+                className={`w-full py-4 rounded-xl font-black text-xl uppercase tracking-widest transition active:scale-95 ${
+                  hasVoted
+                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                    : 'bg-gold text-black hover:bg-yellow-400'
+                }`}
+              >
+                {hasVoted ? 'Vote Locked 🔒' : 'Submit Hot Take'}
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
