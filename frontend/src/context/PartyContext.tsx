@@ -10,6 +10,13 @@ import { useNavigate } from 'react-router-dom';
 import { getSocket } from '../lib/socket';
 import type { Party, Song, SongResult, User, RatingWindowState } from '../types';
 
+// shared reason for the toast/alert that explains why we kicked the user
+const PARTY_CLOSED_REASONS: Record<string, string> = {
+  host_left: 'The host left, so the party has been closed.',
+  ended: 'This party has already ended.',
+  not_found: "We couldn't find that party — it may have been closed.",
+};
+
 interface PartyContextValue {
   party: Party | null;
   currentUser: User | null;
@@ -30,6 +37,7 @@ interface PartyContextValue {
   emitRatingSubmit: (songId: string, score: number) => void;
   emitPartyEnd: () => void;
   addSongToList: (song: Song) => void;
+  leaveParty: (reasonKey?: string) => void;
 }
 
 const PartyContext = createContext<PartyContextValue | null>(null);
@@ -66,6 +74,27 @@ export function PartyProvider({ children }: { children: ReactNode }) {
   function setCurrentUser(u: User) {
     setCurrentUserState(u);
     sessionStorage.setItem('nero_user', JSON.stringify(u));
+  }
+
+  // wipe local session and bounce home — used when the party gets shut down
+  // server-side so the user can't just retype the URL to come back.
+  function leaveParty(reasonKey?: string) {
+    sessionStorage.removeItem('nero_user');
+    setPartyState(null);
+    setCurrentUserState(null);
+    setUsers([]);
+    setSongs([]);
+    setCurrentSong(null);
+    setRatingWindow(null);
+    setHasVoted(false);
+    setVoteCount(0);
+    setResults([]);
+    if (reasonKey && PARTY_CLOSED_REASONS[reasonKey]) {
+      // a queryParam keeps things shareable / refreshable without state drama
+      navigate(`/?reason=${reasonKey}`);
+    } else {
+      navigate('/');
+    }
   }
 
   function joinRoom(partyId: string, userId: string) {
@@ -155,6 +184,16 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       if (party?.id) navigate(`/party/${party.id}/podium`);
     });
 
+    // host bailed (or party was abandoned) — the URL is no longer valid.
+    socket.on('party:closed', ({ reason }: { reason?: string }) => {
+      leaveParty(reason ?? 'ended');
+    });
+
+    // server told us the party doesn't exist anymore
+    socket.on('party:not_found', () => {
+      leaveParty('not_found');
+    });
+
     return () => {
       socket.off('party:state');
       socket.off('user:joined');
@@ -165,7 +204,11 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       socket.off('rating:tally');
       socket.off('rating:close');
       socket.off('party:end');
+      socket.off('party:closed');
+      socket.off('party:not_found');
     };
+  // leaveParty is stable enough for our purposes; rebinding only on party id change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, navigate, party?.id]);
 
   const value: PartyContextValue = {
@@ -187,6 +230,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     emitRatingSubmit,
     emitPartyEnd,
     addSongToList,
+    leaveParty,
   };
 
   return <PartyContext.Provider value={value}>{children}</PartyContext.Provider>;

@@ -1,17 +1,40 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { createParty, joinParty } from '../lib/api';
 import { useParty } from '../context/PartyContext';
 
 type Tab = 'create' | 'join';
 
+// human-readable explanations for the ?reason= we land back here with
+const REASON_MESSAGES: Record<string, string> = {
+  host_left: 'The host left, so the party has been closed.',
+  ended: 'That party has already ended.',
+  not_found: "We couldn't find that party — the link may no longer be valid.",
+};
+
 export default function Home() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { setParty, setCurrentUser, joinRoom } = useParty();
   const [tab, setTab] = useState<Tab>('create');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const reason = searchParams.get('reason');
+  const reasonMessage = reason ? REASON_MESSAGES[reason] : null;
+
+  // clear ?reason from the url after the user sees it once
+  useEffect(() => {
+    if (!reason) return;
+    const timer = setTimeout(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('reason');
+      setSearchParams(next, { replace: true });
+    }, 8000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reason]);
 
   // create form
   const [partyName, setPartyName] = useState('');
@@ -92,6 +115,17 @@ export default function Home() {
           Rate songs. Settle debates. Crown the banger.
         </p>
       </motion.div>
+
+      {reasonMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 w-full max-w-md rounded-xl border border-orange-700/40 bg-orange-900/20 px-4 py-3 text-sm text-orange-200"
+          role="alert"
+        >
+          {reasonMessage}
+        </motion.div>
+      )}
 
       {/* card */}
       <motion.div

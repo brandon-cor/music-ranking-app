@@ -2,17 +2,28 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useParty } from '../context/PartyContext';
-import { getParty } from '../lib/api';
+import { ApiError, getParty } from '../lib/api';
 import SongSearch from '../components/SongSearch';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
 import { PartyCodeEditor } from '../components/PartyCodeEditor';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import { getSocket } from '../lib/socket';
 
 export default function Lobby() {
   const { partyId } = useParams<{ partyId: string }>();
   const navigate = useNavigate();
-  const { party, currentUser, users, songs, setParty, setCurrentUser, joinRoom, isHost } = useParty();
+  const {
+    party,
+    currentUser,
+    users,
+    songs,
+    setParty,
+    setCurrentUser,
+    joinRoom,
+    isHost,
+    leaveParty,
+  } = useParty();
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
 
@@ -35,8 +46,16 @@ export default function Lobby() {
           }
         }
         if (user) joinRoom(partyId, user.id);
-      } catch {
-        navigate('/');
+      } catch (err) {
+        // 410 (PARTY_ENDED) → kick to home with a friendly reason; everything
+        // else is a generic redirect home.
+        if (err instanceof ApiError && err.code === 'PARTY_ENDED') {
+          leaveParty('ended');
+        } else if (err instanceof ApiError && err.status === 404) {
+          leaveParty('not_found');
+        } else {
+          navigate('/');
+        }
       }
     };
 
@@ -89,6 +108,12 @@ export default function Lobby() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-2"
         >
+          <Breadcrumbs
+            items={[
+              { label: 'Home', to: '/' },
+              { label: party.name },
+            ]}
+          />
           <p className="text-gold text-xs font-bold uppercase tracking-widest">Party Lobby</p>
           <h1 className="display-num text-5xl">{party.name}</h1>
 

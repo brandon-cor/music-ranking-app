@@ -65,6 +65,13 @@ router.get('/:id', async (req, res) => {
       return;
     }
 
+    // ended parties are no longer joinable from the URL — only the podium
+    // (which uses the results endpoint) can read them.
+    if (party.status === 'ended') {
+      res.status(410).json({ error: 'This party has ended', code: 'PARTY_ENDED' });
+      return;
+    }
+
     // never expose Spotify tokens over the wire
     const { spotify_access_token: _, spotify_refresh_token: __, ...safeParty } = party;
     res.json(safeParty);

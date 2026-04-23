@@ -4,6 +4,11 @@ import { prisma } from '../lib/prisma';
 // one timer per party — tracks the active rating window
 const ratingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// grace period for host reconnects (page refresh / quick nav). if the host
+// doesn't come back within this window, the party is considered abandoned.
+const HOST_DISCONNECT_GRACE_MS = 5000;
+const hostGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export function setupSocket(io: Server) {
   io.on('connection', (socket: Socket) => {
     // party:join — user joins a party room and receives current state
@@ -23,7 +28,25 @@ export function setupSocket(io: Server) {
         prisma.user.findUnique({ where: { id: userId } }),
       ]);
 
-      if (!party || !user) return;
+      if (!party || !user) {
+        socket.emit('party:not_found');
+        return;
+      }
+
+      // party already closed (host abandoned or explicitly ended) — kick the user
+      if (party.status === 'ended') {
+        socket.emit('party:closed', { reason: 'ended' });
+        return;
+      }
+
+      // host is rejoining within the grace window — cancel the pending end
+      if (party.host_id === userId) {
+        const pending = hostGraceTimers.get(partyId);
+        if (pending) {
+          clearTimeout(pending);
+          hostGraceTimers.delete(partyId);
+        }
+      }
 
       // tell everyone else someone joined
       socket.to(`party:${partyId}`).emit('user:joined', { user });
@@ -154,10 +177,54 @@ export function setupSocket(io: Server) {
       io.to(`party:${partyId}`).emit('party:end', { results });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       const { partyId, userId } = socket.data as { partyId?: string; userId?: string };
-      if (partyId && userId) {
-        io.to(`party:${partyId}`).emit('user:left', { userId });
+      if (!partyId || !userId) return;
+
+      io.to(`party:${partyId}`).emit('user:left', { userId });
+
+      // if the disconnecting user is the host, start a grace timer.
+      // if they don't reconnect in time, the party is closed for everyone.
+      try {
+        const party = await prisma.party.findUnique({ where: { id: partyId } });
+        if (!party || party.status === 'ended' || party.host_id !== userId) return;
+
+        // if the host has another open socket in this room, no need to end yet
+        const remaining = await io.in(`party:${partyId}`).fetchSockets();
+        const hostStillConnected = remaining.some(
+          (s) => s.id !== socket.id && s.data?.userId === userId,
+        );
+        if (hostStillConnected) return;
+
+        // already a pending grace timer — leave it alone
+        if (hostGraceTimers.has(partyId)) return;
+
+        const timer = setTimeout(async () => {
+          hostGraceTimers.delete(partyId);
+
+          // double-check the host hasn't returned in the meantime
+          const stillEmpty = await io.in(`party:${partyId}`).fetchSockets();
+          const hostBack = stillEmpty.some((s) => s.data?.userId === userId);
+          if (hostBack) return;
+
+          // clean up rating timer if one was running
+          const ratingTimer = ratingTimers.get(partyId);
+          if (ratingTimer) {
+            clearTimeout(ratingTimer);
+            ratingTimers.delete(partyId);
+          }
+
+          await prisma.party.update({
+            where: { id: partyId },
+            data: { status: 'ended' },
+          });
+
+          io.to(`party:${partyId}`).emit('party:closed', { reason: 'host_left' });
+        }, HOST_DISCONNECT_GRACE_MS);
+
+        hostGraceTimers.set(partyId, timer);
+      } catch (error) {
+        console.error('disconnect handler error', error);
       }
     });
   });

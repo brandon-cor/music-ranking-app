@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParty } from '../context/PartyContext';
-import { getParty, getSpotifyToken, spotifyPlay } from '../lib/api';
+import { ApiError, getParty, getSpotifyToken, spotifyPlay } from '../lib/api';
 import { playRatingOpen, playVoteConfirm } from '../lib/audio';
 import NowPlaying from '../components/NowPlaying';
 import Queue from '../components/Queue';
@@ -10,6 +10,7 @@ import UserList from '../components/UserList';
 import Countdown from '../components/Countdown';
 import RatingSlider from '../components/RatingSlider';
 import { PartyCodeEditor } from '../components/PartyCodeEditor';
+import { Breadcrumbs } from '../components/Breadcrumbs';
 import type { SpotifyPlayer } from '../types';
 
 export default function Player() {
@@ -32,6 +33,7 @@ export default function Player() {
     emitRatingOpen,
     emitRatingSubmit,
     emitPartyEnd,
+    leaveParty,
   } = useParty();
 
   // Spotify Web Playback SDK state (host only)
@@ -59,8 +61,14 @@ export default function Player() {
           }
         }
         if (user) joinRoom(partyId, user.id);
-      } catch {
-        navigate('/');
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'PARTY_ENDED') {
+          leaveParty('ended');
+        } else if (err instanceof ApiError && err.status === 404) {
+          leaveParty('not_found');
+        } else {
+          navigate('/');
+        }
       }
     };
     if (!party) restore();
@@ -206,20 +214,30 @@ export default function Player() {
 
       <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
         {/* header */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-gold text-xs font-bold uppercase tracking-widest">Live</p>
-            <h1 className="display-num text-3xl">{party.name}</h1>
+        <div className="flex flex-col gap-3">
+          <Breadcrumbs
+            items={[
+              { label: 'Home', to: '/' },
+              { label: party.name, to: `/party/${partyId}/lobby` },
+              { label: 'Live' },
+            ]}
+          />
+
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-gold text-xs font-bold uppercase tracking-widest">Live</p>
+              <h1 className="display-num text-3xl">{party.name}</h1>
+            </div>
+            {partyId && <PartyCodeEditor partyCode={partyId} />}
+            {isHost && (
+              <button
+                onClick={emitPartyEnd}
+                className="text-xs text-gray-600 hover:text-red-400 border border-gray-800 hover:border-red-900 px-3 py-1.5 rounded-lg transition"
+              >
+                End Party
+              </button>
+            )}
           </div>
-          {partyId && <PartyCodeEditor partyCode={partyId} />}
-          {isHost && (
-            <button
-              onClick={emitPartyEnd}
-              className="text-xs text-gray-600 hover:text-red-400 border border-gray-800 hover:border-red-900 px-3 py-1.5 rounded-lg transition"
-            >
-              End Party
-            </button>
-          )}
         </div>
 
         {/* now playing */}

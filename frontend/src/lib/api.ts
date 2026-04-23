@@ -2,13 +2,29 @@ import type { Party, User, Song, SpotifyTrack, SongResult } from '../types';
 
 const BASE = '/api';
 
+// thrown when the API returns a non-2xx response. carries the http status and
+// any backend-provided code so callers can react to specific failures (e.g. 410).
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(data.error || 'Request failed', res.status, data.code);
+  }
   return data as T;
 }
 
