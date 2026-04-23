@@ -103,3 +103,24 @@ body {
     0 0 10px rgba(255, 0, 0, 0.8),
     0 0 30px rgba(255, 0, 0, 0.5);
 }
+
+/* left-side scrollbar for player sidebar lists */
+.scrollbar-left {
+  direction: rtl;
+}
+.scrollbar-left > * {
+  direction: ltr;
+}
+.scrollbar-left::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-left::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-left::-webkit-scrollbar-thumb {
+  background: rgba(80, 80, 80, 0.6);
+  border-radius: 9999px;
+}
+.scrollbar-left::-webkit-scrollbar-thumb:hover {
+  background: rgba(110, 110, 110, 0.8);
+}

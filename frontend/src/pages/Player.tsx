@@ -364,7 +364,7 @@ export default function Player() {
                 <h2 className="mb-3 shrink-0 text-sm font-bold uppercase tracking-wide text-muted">
                   In the room ({users.length})
                 </h2>
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="scrollbar-left min-h-0 flex-1 overflow-y-auto">
                   <UserList
                     users={users}
                     hostId={party.host_id}
@@ -375,7 +375,7 @@ export default function Player() {
               </section>
               <section className="flex min-h-0 flex-1 flex-col">
                 <h2 className="mb-3 shrink-0 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <div className="scrollbar-left min-h-0 flex-1 overflow-y-auto">
                   <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
                 </div>
               </section>
