@@ -45,6 +45,7 @@ interface PartyContextValue {
   emitSongResume: () => void;
   emitPartyEnd: () => void;
   addSongToList: (song: Song) => void;
+  emitUserReady: (ready: boolean) => void;
   leaveParty: (reasonKey?: string) => void;
 }
 
@@ -143,6 +144,10 @@ export function PartyProvider({ children }: { children: ReactNode }) {
 
   function emitPartyEnd() {
     socket.emit('party:end');
+  }
+
+  function emitUserReady(ready: boolean) {
+    socket.emit('user:ready', { ready });
   }
 
   function addSongToList(song: Song) {
@@ -326,6 +331,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     emitSongResume,
     emitPartyEnd,
     addSongToList,
+    emitUserReady,
     leaveParty,
   };
 

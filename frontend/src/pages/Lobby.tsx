@@ -26,6 +26,7 @@ export default function Lobby() {
     joinRoom,
     isHost,
     leaveParty,
+    emitUserReady,
   } = useParty();
 
   const [activeTab, setActiveTab] = useState<'search' | 'queue'>('search');
@@ -99,13 +100,6 @@ export default function Lobby() {
     };
   }, [partyId, navigate]);
 
-  const handleStartParty = () => {
-    if (!party || !currentUser) return;
-    const socket = getSocket();
-    socket.emit('party:start', { partyId: party.id });
-    navigate(`/party/${party.id}/play`);
-  };
-
   const spotifyAuthUrl =
     partyId && currentUser
       ? `/api/spotify/auth?userId=${encodeURIComponent(currentUser.id)}&partyId=${encodeURIComponent(partyId)}`
@@ -122,6 +116,7 @@ export default function Lobby() {
   }
 
   const hostConnected = !!users.find((u) => u.id === party.host_id)?.spotify_connected;
+  const readyCount = users.filter((u) => u.is_ready).length;
 
   return (
     <NeroPageShell>
@@ -142,32 +137,37 @@ export default function Lobby() {
             <h1 className="display-num min-w-0 flex-1 text-4xl text-white sm:text-5xl">
               {party.name}
             </h1>
-            {isHost && (
+            {currentUser && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.12 }}
-                className="shrink-0"
+                className="flex shrink-0 flex-col items-end gap-1"
               >
                 <button
                   type="button"
-                  onClick={handleStartParty}
-                  disabled={songs.length === 0 || !hostConnected}
-                  title={
-                    songs.length === 0
-                      ? 'Add at least one song to the queue before starting.'
-                      : !hostConnected
-                        ? 'Connect Spotify in the room panel before starting.'
-                        : 'Start the party and go to the live player.'
-                  }
-                  className="btn-nero-cta min-h-[2.35rem] px-4 py-2 text-xs font-bold uppercase tracking-wide sm:px-5 sm:text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => emitUserReady(!currentUser.is_ready)}
+                  className={`btn-nero-cta min-h-[2.35rem] px-4 py-2 text-xs font-bold uppercase tracking-wide sm:px-5 sm:text-sm ${
+                    currentUser.is_ready ? 'bg-accent/20 text-accent' : ''
+                  }`}
                 >
-                  {songs.length === 0
-                    ? 'Add songs to start'
-                    : !hostConnected
-                      ? 'Waiting for Spotify'
-                      : 'Start the Party'}
+                  {currentUser.is_ready ? 'Ready ✓' : 'Ready Up'}
                 </button>
+                <p className="max-w-[14rem] text-right text-[0.65rem] leading-snug text-muted sm:text-xs">
+                  {readyCount} / {users.length} ready
+                  {!hostConnected && (
+                    <>
+                      {' '}
+                      · waiting for host to connect Spotify
+                    </>
+                  )}
+                  {songs.length === 0 && (
+                    <>
+                      {' '}
+                      · add songs before starting
+                    </>
+                  )}
+                </p>
               </motion.div>
             )}
           </div>
@@ -295,10 +295,6 @@ export default function Lobby() {
         <p className="text-xs text-muted">
           When the party starts, everyone gets a <strong className="text-white">30s</strong> window to rate each clip.
         </p>
-
-        {!isHost && (
-          <p className="text-center text-sm text-muted animate-pulse">Waiting for the host to start the party…</p>
-        )}
       </div>
     </NeroPageShell>
   );

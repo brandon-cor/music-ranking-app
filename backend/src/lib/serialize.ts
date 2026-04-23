@@ -6,6 +6,7 @@ export interface SafeUser {
   id: string;
   name: string;
   party_id: string;
+  is_ready: boolean;
   spotify_connected: boolean;
 }
 
@@ -29,6 +30,7 @@ export function toSafeUser(user: User): SafeUser {
     id: user.id,
     name: user.name,
     party_id: user.party_id,
+    is_ready: user.is_ready,
     spotify_connected: !!user.spotify_access_token,
   };
 }

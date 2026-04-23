@@ -17,6 +17,7 @@ export interface User {
   id: string;
   name: string;
   party_id: string;
+  is_ready: boolean;
   spotify_connected: boolean;
 }
 

@@ -46,10 +46,16 @@ export default function UserList({ users, hostId, currentUserId, votedUserIds }:
             {user.id === currentUserId && (
               <span className="ml-1 text-gray-500 text-xs">(you)</span>
             )}
-            {votedUserIds?.includes(user.id) && (
+            {votedUserIds?.includes(user.id) ? (
               <span className="ml-1 text-xs text-success" aria-label="Voted">
                 ✓
               </span>
+            ) : (
+              user.is_ready && (
+                <span className="ml-1 text-xs text-success" aria-label="Ready">
+                  ✓
+                </span>
+              )
             )}
           </span>
         </div>

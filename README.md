@@ -74,7 +74,7 @@ nero-party/
 1. Host creates a party → receives a shareable party code.
 2. Host connects Spotify from the lobby (Premium required).
 3. Guests join via the code, add songs from Spotify search.
-4. Host starts the party; each song plays through the host's browser via the Spotify Web Playback SDK.
+4. Everyone taps **Ready Up** in the lobby; when all are ready, the host has Spotify connected, and there is at least one song, the party **auto-starts**. Playback order is **round-robin** by contributor (host pick, then each guest’s first pick, then round two, etc.). Each song plays through the host's browser via the Spotify Web Playback SDK.
 5. Host opens a rating window (15–60s); everyone submits a score 0–100.
 6. After the queue is exhausted, the podium reveals the ranked results.
 

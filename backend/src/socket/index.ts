@@ -30,6 +30,85 @@ const ratingFinalizedKeys = new Set<string>();
 const HOST_DISCONNECT_GRACE_MS = 5000;
 const hostGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+/** Host first, then other members sorted by id (stable round-robin order). */
+function sortUsersForRoundRobin(party: { host_id: string | null }, users: { id: string }[]) {
+  if (!party.host_id) {
+    return [...users].sort((a, b) => a.id.localeCompare(b.id));
+  }
+  const host = users.find((u) => u.id === party.host_id);
+  const rest = users
+    .filter((u) => u.id !== party.host_id)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return host ? [host, ...rest] : [...users].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** Interleave songs by user (round 1 pick from each, round 2, …). */
+function interleaveByUser<T extends { added_by_user_id: string | null }>(
+  users: { id: string }[],
+  songs: T[],
+): T[] {
+  const groups = users.map((u) => songs.filter((s) => s.added_by_user_id === u.id));
+  const orphans = songs.filter(
+    (s) => !s.added_by_user_id || !users.some((u) => u.id === s.added_by_user_id),
+  );
+  const maxLen = Math.max(0, ...groups.map((g) => g.length));
+  const out: T[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    for (const g of groups) {
+      if (i < g.length) out.push(g[i]);
+    }
+  }
+  return [...out, ...orphans];
+}
+
+async function startParty(io: Server, partyId: string) {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    include: {
+      users: true,
+      songs: { orderBy: { order: 'asc' } },
+    },
+  });
+  if (!party || party.status !== 'lobby') return;
+  if (party.songs.length < 1) return;
+
+  const usersOrdered = sortUsersForRoundRobin(party, party.users);
+  const interleaved = interleaveByUser(usersOrdered, party.songs);
+
+  await prisma.$transaction(
+    interleaved.map((s, i) =>
+      prisma.song.update({ where: { id: s.id }, data: { order: i } }),
+    ),
+  );
+  await prisma.user.updateMany({ where: { party_id: partyId }, data: { is_ready: false } });
+  await prisma.party.update({ where: { id: partyId }, data: { status: 'playing' } });
+
+  const updated = await prisma.party.findUnique({
+    where: { id: partyId },
+    include: {
+      users: { orderBy: { id: 'asc' } },
+      songs: { orderBy: { order: 'asc' } },
+    },
+  });
+  if (updated) {
+    io.in(`party:${partyId}`).emit('party:state', toSafeParty(updated));
+    io.in(`party:${partyId}`).emit('party:start');
+  }
+}
+
+async function maybeAutoStart(io: Server, partyId: string) {
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    include: { users: true, songs: true },
+  });
+  if (!party || party.status !== 'lobby') return;
+  if (party.songs.length < 1) return;
+  if (!party.users.every((u) => u.is_ready)) return;
+  const host = party.users.find((u) => u.id === party.host_id);
+  if (!host?.spotify_access_token) return;
+  await startParty(io, partyId);
+}
+
 function clearRatingTimer(partyId: string) {
   const existing = ratingTimers.get(partyId);
   if (existing) clearTimeout(existing.timer);
@@ -130,38 +209,38 @@ export function setupSocket(io: Server) {
       socket.to(`party:${partyId}`).emit('user:joined', { user: toSafeUser(user) });
 
       socket.emit('party:state', toSafeParty(party));
+      void maybeAutoStart(io, partyId);
     });
 
     // user:spotify_connected — the caller just finished OAuth; tell the room
-    // so everyone can see their "connected" flag update and the host can
-    // enable the Start-the-Party button once all guests are ready.
+    // so everyone can see their "connected" flag update; auto-start may run
+    // when everyone is ready and the queue has songs.
     socket.on('user:spotify_connected', async () => {
       const { partyId, userId } = socket.data as { partyId?: string; userId?: string };
       if (!partyId || !userId) return;
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) return;
       io.to(`party:${partyId}`).emit('user:updated', { user: toSafeUser(user) });
+      await maybeAutoStart(io, partyId);
     });
 
-    // party:start — host starts the party, broadcast to all guests in lobby
+    socket.on('user:ready', async ({ ready }: { ready: boolean }) => {
+      const { partyId, userId } = socket.data as { partyId?: string; userId?: string };
+      if (!partyId || !userId) return;
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { is_ready: !!ready },
+      });
+      io.to(`party:${partyId}`).emit('user:updated', { user: toSafeUser(user) });
+      await maybeAutoStart(io, partyId);
+    });
+
+    // party:start — host-only manual start (same reorder + broadcast as auto-start)
     socket.on('party:start', async ({ partyId: pid }: { partyId: string }) => {
       const { userId } = socket.data as { userId: string };
       const p = await prisma.party.findUnique({ where: { id: pid } });
       if (!p || p.host_id !== userId) return;
-
-      await prisma.party.update({ where: { id: pid }, data: { status: 'playing' } });
-      const updated = await prisma.party.findUnique({
-        where: { id: pid },
-        include: {
-          users: true,
-          songs: { orderBy: { order: 'asc' } },
-        },
-      });
-      if (updated) {
-        // include the host so their client picks up status: playing before/after navigation
-        io.in(`party:${pid}`).emit('party:state', toSafeParty(updated));
-      }
-      socket.to(`party:${pid}`).emit('party:start');
+      await startParty(io, pid);
     });
 
     // song:play — host starts the next song

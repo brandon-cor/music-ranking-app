@@ -28,6 +28,7 @@ model User {
   id                       String    @id @default(cuid())
   name                     String
   party_id                 String
+  is_ready                 Boolean   @default(false)
   spotify_access_token     String?
   spotify_refresh_token    String?
   /// When the access token is expected to expire (refresh before Spotify rejects it).
