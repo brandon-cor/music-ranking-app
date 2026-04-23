@@ -322,21 +322,9 @@ export default function Player() {
               ]}
             />
 
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-accent">Live</p>
-                <h1 className="display-num text-3xl text-white">{party.name}</h1>
-              </div>
-              <div className="ml-auto shrink-0 pt-1">
-                {ratingWindow && (
-                  <CircleCountdown
-                    endsAt={ratingWindow.endsAt}
-                    durationMs={ratingWindow.duration * 1000}
-                    pausedRemainingMs={ratingPausedRemainingMs}
-                    size={104}
-                  />
-                )}
-              </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-accent">Live</p>
+              <h1 className="display-num text-3xl text-white">{party.name}</h1>
             </div>
           </div>
 
@@ -379,7 +367,15 @@ export default function Player() {
               />
             </div>
 
-            <div className="flex min-h-0 min-w-0 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-col items-center gap-4 pt-2">
+              {ratingWindow && (
+                <CircleCountdown
+                  endsAt={ratingWindow.endsAt}
+                  durationMs={ratingWindow.duration * 1000}
+                  pausedRemainingMs={ratingPausedRemainingMs}
+                  size={104}
+                />
+              )}
               <RatingPanel ratingWindow={ratingWindow} hasVoted={hasVoted} onEmojiVote={handleEmojiVote} />
             </div>
           </div>
