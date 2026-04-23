@@ -136,7 +136,39 @@ export default function Lobby() {
             ]}
           />
           <p className="text-xs font-bold uppercase tracking-widest text-accent">Party Lobby</p>
-          <h1 className="display-num text-4xl text-white sm:text-5xl">{party.name}</h1>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <h1 className="display-num min-w-0 flex-1 text-4xl text-white sm:text-5xl">
+              {party.name}
+            </h1>
+            {isHost && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="shrink-0"
+              >
+                <button
+                  type="button"
+                  onClick={handleStartParty}
+                  disabled={songs.length === 0 || !hostConnected}
+                  title={
+                    songs.length === 0
+                      ? 'Add at least one song to the queue before starting.'
+                      : !hostConnected
+                        ? 'Connect Spotify in the room panel before starting.'
+                        : 'Start the party and go to the live player.'
+                  }
+                  className="btn-nero-cta min-h-[2.35rem] px-4 py-2 text-xs font-bold uppercase tracking-wide sm:px-5 sm:text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {songs.length === 0
+                    ? 'Add songs to start'
+                    : !hostConnected
+                      ? 'Waiting for Spotify'
+                      : 'Start the Party'}
+                </button>
+              </motion.div>
+            )}
+          </div>
 
           {partyId && <PartyCodeEditor partyCode={partyId} className="mt-2" />}
         </motion.div>
@@ -224,27 +256,6 @@ export default function Lobby() {
         <p className="text-xs text-muted">
           When the party starts, everyone gets a <strong className="text-white">30s</strong> window to rate each clip.
         </p>
-
-        {isHost && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <button
-              type="button"
-              onClick={handleStartParty}
-              disabled={songs.length === 0 || !hostConnected}
-              className="btn-nero-cta w-full py-3 text-base disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {songs.length === 0
-                ? 'Add songs to start'
-                : !hostConnected
-                  ? 'Waiting for host to connect Spotify'
-                  : 'Start the Party'}
-            </button>
-          </motion.div>
-        )}
 
         {!isHost && (
           <p className="text-center text-sm text-muted animate-pulse">Waiting for the host to start the party…</p>
