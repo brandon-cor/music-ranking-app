@@ -1,4 +1,5 @@
-// Fixed pill navbar aligned with nero.fan: search, wordmark, profile — side icons link to nero.fan
+// Fixed pill navbar: side icons → nero.fan; center wordmark → app home.
+import { Link } from 'react-router-dom';
 import neroLogo from '../nero.png';
 
 const NERO_FAN = 'https://www.nero.fan/';
@@ -35,15 +36,14 @@ export function NeroNav() {
           <SearchIcon />
         </a>
 
-        <a
-          href={NERO_FAN}
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          to="/"
           className="flex select-none items-center gap-1.5 text-base font-medium tracking-tight text-white transition hover:opacity-90"
+          aria-label="Home"
         >
           <img src={neroLogo} alt="" className="h-5 w-5 object-contain" width={20} height={20} aria-hidden />
           <span>nero</span>
-        </a>
+        </Link>
 
         <a
           href={NERO_FAN}
