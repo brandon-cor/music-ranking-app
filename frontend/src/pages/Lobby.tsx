@@ -1,4 +1,4 @@
-// Pre-game lobby: Spotify connect, queue build, start party
+// Pre-game lobby: two-column room + add songs, host Spotify status, queue and start
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -104,9 +104,6 @@ export default function Lobby() {
     navigate(`/party/${party.id}/play`);
   };
 
-  const allSpotifyReady =
-    users.length > 0 && users.every((u) => u.spotify_connected);
-
   const spotifyAuthUrl =
     partyId && currentUser
       ? `/api/spotify/auth?userId=${encodeURIComponent(currentUser.id)}&partyId=${encodeURIComponent(partyId)}`
@@ -122,9 +119,11 @@ export default function Lobby() {
     );
   }
 
+  const hostConnected = !!users.find((u) => u.id === party.host_id)?.spotify_connected;
+
   return (
     <NeroPageShell>
-      <div className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-6">
+      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-6">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -142,58 +141,68 @@ export default function Lobby() {
           {partyId && <PartyCodeEditor partyCode={partyId} className="mt-2" />}
         </motion.div>
 
-        <motion.section
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
-        >
-          {currentUser?.spotify_connected ? (
-            <p className="text-sm font-semibold text-success">
-              You&apos;re connected — you can search, preview clips, and join playback when the party goes live.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-muted">Connect your Spotify Premium.</p>
-              <a
-                href={spotifyAuthUrl}
-                className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#1ed760]"
-              >
-                <SpotifyIcon /> Connect Spotify
-              </a>
-              <p className="text-sm text-muted">
-                Everyone in the room must connect before the host can start.
-              </p>
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="flex min-h-[280px] flex-col rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
+          >
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
+              In the room ({users.length})
+            </h2>
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <div className="min-h-[120px] flex-1">
+                <UserList users={users} hostId={party.host_id} currentUserId={currentUser?.id ?? null} />
+              </div>
+              <div className="mt-auto border-t border-border/30 pt-4">
+                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">Host · Spotify</p>
+                {hostConnected ? (
+                  <motion.span
+                    initial={{ opacity: 0.85 }}
+                    animate={{ opacity: [0.85, 1, 0.85] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                    className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-full border border-accent/50 bg-accent/15 px-4 py-3 text-sm font-bold uppercase tracking-wide text-success shadow-[0_0_24px_rgba(34,197,94,0.45)] sm:w-auto sm:justify-start"
+                  >
+                    <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-success shadow-[0_0_8px_rgba(34,197,94,0.9)]" />
+                    Connected to Spotify
+                  </motion.span>
+                ) : isHost ? (
+                  <a
+                    href={spotifyAuthUrl}
+                    className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-full bg-[#1DB954] px-5 py-3 text-sm font-bold text-black shadow-[0_0_20px_rgba(29,185,84,0.35)] transition hover:bg-[#1ed760] sm:w-auto"
+                  >
+                    <SpotifyIcon /> Connect Spotify
+                  </a>
+                ) : (
+                  <p className="animate-pulse text-sm text-muted">Waiting for host to connect Spotify…</p>
+                )}
+              </div>
             </div>
-          )}
-        </motion.section>
+          </motion.section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
-            In the room ({users.length})
-          </h2>
-          <UserList users={users} hostId={party.host_id} currentUserId={currentUser?.id ?? null} />
-        </section>
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="flex min-h-[280px] flex-col rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
+          >
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">
+              Add songs{' '}
+              <span className="font-normal text-muted">
+                (up to {party.songs_per_user} picks per person)
+              </span>
+            </h2>
 
-        <motion.section
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
-        >
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">
-            Add songs{' '}
-            <span className="font-normal text-muted">
-              (up to {party.songs_per_user} picks per person)
-            </span>
-          </h2>
-
-          {currentUser?.spotify_connected ? (
-            <SongSearch partyId={party.id} />
-          ) : (
-            <p className="text-sm italic text-muted">Connect Spotify to search and add tracks.</p>
-          )}
-        </motion.section>
+            <div className="min-h-0 flex-1">
+              {currentUser?.spotify_connected ? (
+                <SongSearch partyId={party.id} />
+              ) : (
+                <p className="text-sm italic text-muted">Connect Spotify to search and add tracks.</p>
+              )}
+            </div>
+          </motion.section>
+        </div>
 
         {songs.length > 0 && (
           <section>
@@ -215,13 +224,13 @@ export default function Lobby() {
             <button
               type="button"
               onClick={handleStartParty}
-              disabled={songs.length === 0 || !allSpotifyReady}
+              disabled={songs.length === 0 || !hostConnected}
               className="btn-nero-cta w-full py-3 text-base disabled:cursor-not-allowed disabled:opacity-40"
             >
               {songs.length === 0
                 ? 'Add songs to start'
-                : !allSpotifyReady
-                  ? 'Waiting for everyone to connect Spotify'
+                : !hostConnected
+                  ? 'Waiting for host to connect Spotify'
                   : 'Start the Party'}
             </button>
           </motion.div>
