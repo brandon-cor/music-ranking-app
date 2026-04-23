@@ -101,10 +101,11 @@ router.get('/search', async (req, res) => {
 
 // POST /api/spotify/play — tell Spotify to play a track on the host's browser device
 router.post('/play', async (req, res) => {
-  const { partyId, spotifyUri, deviceId } = req.body as {
+  const { partyId, spotifyUri, deviceId, positionMs } = req.body as {
     partyId: string;
     spotifyUri: string;
     deviceId: string;
+    positionMs?: number;
   };
 
   if (!partyId || !spotifyUri || !deviceId) {
@@ -114,11 +115,12 @@ router.post('/play', async (req, res) => {
 
   try {
     let token = await getToken(partyId);
+    const startMs = positionMs ?? 0;
     try {
-      await playTrack(token, spotifyUri, deviceId);
+      await playTrack(token, spotifyUri, deviceId, startMs);
     } catch {
       token = await refreshToken(partyId);
-      await playTrack(token, spotifyUri, deviceId);
+      await playTrack(token, spotifyUri, deviceId, startMs);
     }
     res.json({ ok: true });
   } catch (error) {

@@ -27,6 +27,7 @@ export interface Song {
   cover_url: string;
   added_by: string;
   order: number;
+  start_time_ms: number;
 }
 
 export interface Rating {

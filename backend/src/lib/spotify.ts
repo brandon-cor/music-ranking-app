@@ -84,15 +84,15 @@ export async function searchTracks(query: string, token: string) {
   return data.tracks.items;
 }
 
-// tell Spotify to play a track on a specific device
-export async function playTrack(token: string, spotifyUri: string, deviceId: string) {
+// tell Spotify to play a track on a specific device, optionally from a given position
+export async function playTrack(token: string, spotifyUri: string, deviceId: string, positionMs = 0) {
   const res = await fetch(`${SPOTIFY_API_BASE}/me/player/play?device_id=${deviceId}`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ uris: [spotifyUri] }),
+    body: JSON.stringify({ uris: [spotifyUri], position_ms: positionMs }),
   });
   // 204 = success with no body; 200 is also fine
   if (res.ok || res.status === 204) return;

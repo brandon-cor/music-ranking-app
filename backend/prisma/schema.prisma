@@ -32,16 +32,17 @@ model User {
 }
 
 model Song {
-  id         String   @id @default(cuid())
-  party_id   String
-  spotify_id String
-  title      String
-  artist     String
-  cover_url  String
-  added_by   String
-  order      Int
-  party      Party    @relation(fields: [party_id], references: [id])
-  ratings    Rating[]
+  id            String   @id @default(cuid())
+  party_id      String
+  spotify_id    String
+  title         String
+  artist        String
+  cover_url     String
+  added_by      String
+  order         Int
+  start_time_ms Int      @default(0)
+  party         Party    @relation(fields: [party_id], references: [id])
+  ratings       Rating[]
 }
 
 model Rating {
