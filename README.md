@@ -18,18 +18,21 @@ A real-time song-rating party app. The host queues tracks from Spotify, guests j
 ### Setup
 
 ```bash
-# install deps
+# 1. Install dependencies for both servers
 cd backend && npm install && cd ..
 cd frontend && npm install && cd ..
 
-# configure env
+# 2. Configure environment variables
 cp backend/.env.example backend/.env
-# then fill in SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET
+# Open backend/.env and fill in SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET
 
-# prepare the database
-cd backend && npx prisma migrate dev && cd ..
+# 3. Create and migrate the database (run from repo root)
+cd backend && npx prisma migrate deploy && npx prisma generate && cd ..
 
-# start both servers (backend :3000, frontend :5173)
+# 4. Make the start script executable (only needed once after a fresh clone)
+chmod +x start.sh
+
+# 5. Start both servers (backend :3000, frontend :5173)
 ./start.sh
 ```
 
