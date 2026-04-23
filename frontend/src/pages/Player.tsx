@@ -276,14 +276,19 @@ export default function Player() {
         {missedVote && (
           <motion.div
             key="missed"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 px-6"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setMissedVote(false)}
+            role="alert"
+            aria-live="assertive"
+            className="fixed inset-x-0 bottom-6 z-[100] mx-auto flex w-fit max-w-[90vw] cursor-pointer items-center gap-3 rounded-2xl border border-fiery/30 bg-card/95 px-5 py-3.5 shadow-lg backdrop-blur-sm"
           >
-            <p className="text-center text-xl font-black uppercase tracking-wide text-fiery">
-              Too slow! You missed your time.
-            </p>
+            <span className="text-sm font-bold uppercase tracking-wide text-fiery">
+              Too slow — you missed that round.
+            </span>
+            <span className="ml-1 text-xs text-muted/60">Tap to dismiss</span>
           </motion.div>
         )}
       </AnimatePresence>
