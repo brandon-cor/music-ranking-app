@@ -175,7 +175,7 @@ export default function Lobby() {
           {partyId && <PartyCodeEditor partyCode={partyId} className="mt-2" />}
         </motion.div>
 
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <motion.section
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -220,7 +220,7 @@ export default function Lobby() {
             </div>
           </motion.section>
 
-          <div className="flex min-h-[280px] flex-col lg:min-h-[min(480px,calc(100vh-14rem))]">
+          <div className="flex flex-col">
             <div
               role="tablist"
               aria-label="Add songs and queue"
@@ -248,7 +248,7 @@ export default function Lobby() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
-              className="relative z-0 flex min-h-0 flex-1 flex-col rounded-b-2xl rounded-tr-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
+              className="relative z-0 flex min-h-[280px] flex-col rounded-b-2xl rounded-tr-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
             >
               {activeTab === 'search' && (
                 <div
