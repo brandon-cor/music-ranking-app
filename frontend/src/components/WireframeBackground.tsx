@@ -23,19 +23,6 @@ export function WireframeBackground() {
               />
             );
           })}
-          {Array.from({ length: 16 }, (_, i) => {
-            const angle = (i / 16) * Math.PI * 2;
-            return (
-              <line
-                key={`l-${i}`}
-                x1="500"
-                y1="200"
-                x2={500 + Math.cos(angle) * 400}
-                y2={200 + Math.sin(angle) * 500}
-                opacity="0.35"
-              />
-            );
-          })}
         </g>
       </svg>
     </div>
