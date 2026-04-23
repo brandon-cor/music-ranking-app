@@ -6,6 +6,19 @@ import { prisma } from './prisma';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 
+/** Refresh before Spotify rejects the token (access tokens last ~1h). */
+const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+
+/** Compute absolute expiry from Spotify's `expires_in` (seconds). */
+export function accessTokenExpiresAt(expiresInSeconds: number): Date {
+  return new Date(Date.now() + expiresInSeconds * 1000);
+}
+
+function tokenNeedsRefresh(expiresAt: Date | null): boolean {
+  if (expiresAt === null) return true;
+  return expiresAt.getTime() - TOKEN_EXPIRY_BUFFER_MS <= Date.now();
+}
+
 /** Build the Spotify OAuth authorize URL; state carries both userId and partyId. */
 export function getAuthUrl(userId: string, partyId: string): string {
   const params = new URLSearchParams({
@@ -75,19 +88,42 @@ export async function refreshToken(userId: string): Promise<string> {
     }),
   });
   if (!res.ok) throw new Error('Failed to refresh Spotify token');
-  const data = (await res.json()) as { access_token: string };
+  const data = (await res.json()) as {
+    access_token: string;
+    expires_in?: number;
+    refresh_token?: string;
+  };
+
+  const expiresInSeconds = data.expires_in ?? 3600;
+  const updateData: {
+    spotify_access_token: string;
+    spotify_token_expires_at: Date;
+    spotify_refresh_token?: string;
+  } = {
+    spotify_access_token: data.access_token,
+    spotify_token_expires_at: accessTokenExpiresAt(expiresInSeconds),
+  };
+  if (data.refresh_token) {
+    updateData.spotify_refresh_token = data.refresh_token;
+  }
 
   await prisma.user.update({
     where: { id: userId },
-    data: { spotify_access_token: data.access_token },
+    data: updateData,
   });
   return data.access_token;
 }
 
-/** Returns the current user's access token (throws if they haven't connected). */
+/**
+ * Returns a valid access token. Throws if missing or due for refresh so callers
+ * can fall back to `refreshToken`.
+ */
 export async function getToken(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.spotify_access_token) throw new Error('No Spotify token for this user');
+  if (tokenNeedsRefresh(user.spotify_token_expires_at)) {
+    throw new Error('Spotify token expired or stale');
+  }
   return user.spotify_access_token;
 }
 

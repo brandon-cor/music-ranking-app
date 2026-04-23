@@ -65,19 +65,27 @@ export default function Lobby() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partyId]);
 
-  // After Spotify OAuth redirect, notify the room so `spotify_connected` updates for everyone.
+  // After Spotify OAuth redirect, wait for the server to confirm `party:join` before
+  // notifying the room — avoids a race where `user:spotify_connected` ran before socket.data was set.
   useEffect(() => {
     if (!partyId || !currentUser) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('spotify') !== 'connected') return;
 
-    joinRoom(partyId, currentUser.id);
     const socket = getSocket();
-    const t = window.setTimeout(() => {
+
+    const onPartyState = () => {
       socket.emit('user:spotify_connected');
       window.history.replaceState({}, '', window.location.pathname);
-    }, 400);
-    return () => window.clearTimeout(t);
+      socket.off('party:state', onPartyState);
+    };
+
+    socket.on('party:state', onPartyState);
+    joinRoom(partyId, currentUser.id);
+
+    return () => {
+      socket.off('party:state', onPartyState);
+    };
   }, [partyId, currentUser?.id, joinRoom]);
 
   useEffect(() => {

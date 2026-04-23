@@ -152,8 +152,11 @@ export function PartyProvider({ children }: { children: ReactNode }) {
 
     socket.on('user:joined', ({ user }: { user: User }) => {
       setUsers((prev) => {
-        if (prev.find((u) => u.id === user.id)) return prev;
-        return [...prev, user];
+        const idx = prev.findIndex((u) => u.id === user.id);
+        if (idx === -1) return [...prev, user];
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...user };
+        return next;
       });
     });
 

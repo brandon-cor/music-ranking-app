@@ -25,13 +25,15 @@ model Party {
 }
 
 model User {
-  id                    String   @id @default(cuid())
-  name                  String
-  party_id              String
-  spotify_access_token  String?
-  spotify_refresh_token String?
-  party                 Party    @relation(fields: [party_id], references: [id])
-  ratings               Rating[]
+  id                       String    @id @default(cuid())
+  name                     String
+  party_id                 String
+  spotify_access_token     String?
+  spotify_refresh_token    String?
+  /// When the access token is expected to expire (refresh before Spotify rejects it).
+  spotify_token_expires_at DateTime?
+  party                    Party     @relation(fields: [party_id], references: [id])
+  ratings                  Rating[]
 }
 
 model Song {

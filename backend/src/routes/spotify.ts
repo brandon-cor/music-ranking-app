@@ -11,6 +11,7 @@ import {
   searchTracks,
   playTrack,
   transferPlayback,
+  accessTokenExpiresAt,
 } from '../lib/spotify';
 
 const router = Router();
@@ -53,6 +54,7 @@ router.get('/callback', async (req, res) => {
       data: {
         spotify_access_token: tokens.access_token,
         spotify_refresh_token: tokens.refresh_token,
+        spotify_token_expires_at: accessTokenExpiresAt(tokens.expires_in),
       },
     });
 
