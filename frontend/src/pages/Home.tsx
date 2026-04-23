@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { createParty, joinParty } from '../lib/api';
 import { useParty } from '../context/PartyContext';
 import { NeroPageShell } from '../components/NeroPageShell';
+import { randomDjDisplayName, randomPartyIdea } from '../lib/homeRandomSuggestions';
 
 type Tab = 'create' | 'join';
 
@@ -157,13 +158,15 @@ export default function Home() {
                   label="Party Name"
                   value={partyName}
                   onChange={setPartyName}
-                  placeholder="e.g. Friday Night Bangers"
+                  placeholder="Type a name or tap Shuffle"
+                  onShuffle={() => setPartyName(randomPartyIdea())}
                 />
                 <Field
                   label="Your Name"
                   value={hostName}
                   onChange={setHostName}
-                  placeholder="e.g. DJ Nero"
+                  placeholder="Type a name or tap Shuffle (starts with DJ)"
+                  onShuffle={() => setHostName(randomDjDisplayName())}
                 />
 
                 <div>
@@ -207,7 +210,8 @@ export default function Home() {
                   label="Your Name"
                   value={guestName}
                   onChange={setGuestName}
-                  placeholder="e.g. Music Fan"
+                  placeholder="Type a name or tap Shuffle (starts with DJ)"
+                  onShuffle={() => setGuestName(randomDjDisplayName())}
                 />
 
                 {error && <p className="text-sm text-red-400">{error}</p>}
@@ -233,17 +237,28 @@ function Field({
   value,
   onChange,
   placeholder,
+  onShuffle,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  onShuffle?: () => void;
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-        {label}
-      </label>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</label>
+        {onShuffle && (
+          <button
+            type="button"
+            onClick={onShuffle}
+            className="shrink-0 text-xs font-semibold uppercase tracking-wide text-accent transition hover:text-accent/80 focus:outline-none focus:ring-2 focus:ring-accent/30 rounded"
+          >
+            Shuffle
+          </button>
+        )}
+      </div>
       <input
         type="text"
         value={value}
