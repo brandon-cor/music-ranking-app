@@ -215,11 +215,17 @@ export default function Podium() {
 
   return (
     <NeroPageShell>
-      <div className="mx-auto flex max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:min-h-[calc(100vh-5rem)] lg:py-6">
+      <div
+        className={`mx-auto flex w-full max-w-6xl flex-col px-4 py-6 sm:px-6 ${
+          phase === 'revealed'
+            ? 'min-h-[calc(100dvh-5rem)] justify-center gap-5 sm:gap-6'
+            : 'min-h-[calc(100dvh-5rem)]'
+        }`}
+      >
         <motion.div
           initial={{ opacity: 0, y: -24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 shrink-0 text-center sm:mb-8"
+          className={`shrink-0 text-center ${phase === 'revealed' ? 'mb-0' : 'mb-6 sm:mb-8'}`}
         >
           <p className="mb-1 text-xs font-bold uppercase tracking-widest text-accent">
             {party?.name ?? 'Nero Party'} · Final Results
@@ -293,10 +299,10 @@ export default function Podium() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex min-h-0 flex-1 flex-col gap-6"
+            className="flex w-full flex-col gap-5 sm:gap-6"
           >
             <div
-              className={`flex min-h-0 flex-1 flex-col gap-6 ${
+              className={`flex w-full flex-col gap-5 sm:gap-6 ${
                 rest.length > 0
                   ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-3 xl:grid-cols-[minmax(0,1fr)_20rem]'
                   : ''
@@ -339,7 +345,7 @@ export default function Podium() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.45 }}
-              className="flex shrink-0 justify-center pt-2 sm:pt-4"
+              className="flex justify-center"
             >
               <button
                 type="button"
