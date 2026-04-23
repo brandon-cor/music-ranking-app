@@ -244,7 +244,7 @@ export default function Podium() {
             <button
               type="button"
               onClick={startReveal}
-              className="btn-nero-cta animate-bounce px-10 py-4 text-xl font-black uppercase tracking-widest sm:px-12 sm:py-5 sm:text-2xl"
+              className="btn-nero-cta animate-bounce px-10 py-4 text-xl font-black uppercase tracking-widest transition hover:shadow-[0_0_36px_rgba(0,255,148,0.45)] sm:px-12 sm:py-5 sm:text-2xl"
             >
               Reveal Results
             </button>
