@@ -1,5 +1,5 @@
 // Pre-game lobby: two-column room + add songs, host Spotify status, queue and start
-import { useEffect } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useParty } from '../context/PartyContext';
@@ -27,6 +27,8 @@ export default function Lobby() {
     isHost,
     leaveParty,
   } = useParty();
+
+  const [activeTab, setActiveTab] = useState<'search' | 'queue'>('search');
 
   useEffect(() => {
     if (!partyId) return;
@@ -218,35 +220,77 @@ export default function Lobby() {
             </div>
           </motion.section>
 
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="flex min-h-[280px] flex-col rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
-          >
-            <div className="mb-3 flex flex-col gap-1">
-              <h2 className="text-sm font-bold uppercase tracking-wide">Add songs</h2>
-              <p className="text-xs text-muted">
-                ({party.songs_per_user} per person · {party.songs_per_user * users.length} total) Your picks:{' '}
-                <strong className="text-white">
-                  {songs.filter((s) => s.added_by_user_id === currentUser?.id).length}
-                </strong>{' '}
-                / {party.songs_per_user}
-              </p>
+          <div className="flex min-h-[280px] flex-col lg:min-h-[min(480px,calc(100vh-14rem))]">
+            <div
+              role="tablist"
+              aria-label="Add songs and queue"
+              className="-mb-px flex gap-1.5 pl-2"
+            >
+              <TabButton
+                id="lobby-tab-search"
+                ariaControls="lobby-panel-search"
+                active={activeTab === 'search'}
+                onClick={() => setActiveTab('search')}
+              >
+                Search
+              </TabButton>
+              <TabButton
+                id="lobby-tab-queue"
+                ariaControls="lobby-panel-queue"
+                active={activeTab === 'queue'}
+                onClick={() => setActiveTab('queue')}
+              >
+                Queue{' '}
+                <span className="ml-1 font-normal normal-case text-muted">({songs.length})</span>
+              </TabButton>
             </div>
-
-            <div className="min-h-0 flex-1">
-              <SongSearch partyId={party.id} />
-            </div>
-          </motion.section>
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="relative z-0 flex min-h-0 flex-1 flex-col rounded-b-2xl rounded-tr-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
+            >
+              {activeTab === 'search' && (
+                <div
+                  id="lobby-panel-search"
+                  role="tabpanel"
+                  aria-labelledby="lobby-tab-search"
+                  className="flex min-h-0 flex-1 flex-col"
+                >
+                  <div className="mb-3 flex flex-col gap-1">
+                    <h2 className="text-sm font-bold uppercase tracking-wide">Add songs</h2>
+                    <p className="text-xs text-muted">
+                      ({party.songs_per_user} per person · {party.songs_per_user * users.length} total)
+                      Your picks:{' '}
+                      <strong className="text-white">
+                        {songs.filter((s) => s.added_by_user_id === currentUser?.id).length}
+                      </strong>{' '}
+                      / {party.songs_per_user}
+                    </p>
+                  </div>
+                  <div className="min-h-0 flex-1">
+                    <SongSearch partyId={party.id} />
+                  </div>
+                </div>
+              )}
+              {activeTab === 'queue' && (
+                <div
+                  id="lobby-panel-queue"
+                  role="tabpanel"
+                  aria-labelledby="lobby-tab-queue"
+                  className="flex min-h-0 flex-1 flex-col"
+                >
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
+                    In the queue ({songs.length})
+                  </h2>
+                  <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                    <Queue songs={songs} currentSongId={null} />
+                  </div>
+                </div>
+              )}
+            </motion.section>
+          </div>
         </div>
-
-        {songs.length > 0 && (
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
-            <Queue songs={songs} currentSongId={null} />
-          </section>
-        )}
 
         <p className="text-xs text-muted">
           When the party starts, everyone gets a <strong className="text-white">30s</strong> window to rate each clip.
@@ -257,6 +301,36 @@ export default function Lobby() {
         )}
       </div>
     </NeroPageShell>
+  );
+}
+
+interface TabButtonProps {
+  id: string;
+  ariaControls: string;
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}
+
+/** Folder-style tab control for the lobby Search / Queue panel. */
+function TabButton({ id, ariaControls, active, onClick, children }: TabButtonProps) {
+  return (
+    <button
+      id={id}
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={ariaControls}
+      tabIndex={active ? 0 : -1}
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-t-xl border border-b-0 border-border/40 px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${
+        active
+          ? 'relative z-10 bg-card/80 text-white backdrop-blur-sm [clip-path:inset(0_-1px_0_-1px)]'
+          : 'bg-card/40 text-muted hover:bg-card/60 hover:text-white'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
