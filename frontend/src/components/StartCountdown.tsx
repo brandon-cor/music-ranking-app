@@ -3,8 +3,22 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-const STEP_MS = 800;
+const STEP_MS = 1000;
 const STEPS: string[] = ['3', '2', '1', 'GO'];
+
+const stepVariants = {
+  initial: { scale: 0.6, opacity: 0 },
+  show: {
+    scale: 1,
+    opacity: 1,
+    transition: { duration: 0.22, ease: 'easeOut' as const },
+  },
+  leave: {
+    scale: 1.4,
+    opacity: 0,
+    transition: { duration: 0.18, ease: 'easeIn' as const },
+  },
+};
 
 interface StartCountdownProps {
   onComplete: () => void;
@@ -36,10 +50,10 @@ export default function StartCountdown({ onComplete }: StartCountdownProps) {
         {label && (
           <motion.span
             key={label}
-            initial={{ scale: 0.4, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.6, opacity: 0 }}
-            transition={{ type: 'spring', damping: 10, stiffness: 220 }}
+            variants={stepVariants}
+            initial="initial"
+            animate="show"
+            exit="leave"
             className="display-num text-[clamp(120px,30vw,320px)] leading-none text-accent glow-accent"
           >
             {label}

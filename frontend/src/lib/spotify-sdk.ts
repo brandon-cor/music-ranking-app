@@ -35,10 +35,8 @@ export function useUserSpotifyPlayer(
     let cancelled = false;
 
     const init = async () => {
-      let token: string;
       try {
-        const res = await getSpotifyToken(userId);
-        token = res.token;
+        await getSpotifyToken(userId);
       } catch {
         if (!cancelled) {
           setErrorMessage('Connect your Spotify account to play and preview songs.');
@@ -58,7 +56,14 @@ export function useUserSpotifyPlayer(
 
         const player: SpotifyPlayer = new window.Spotify.Player({
           name: 'Nero Party',
-          getOAuthToken: (cb) => cb(token),
+          /** Fetch a fresh token on every SDK request so expiry and refresh stay in sync with the server. */
+          getOAuthToken: (cb) => {
+            void getSpotifyToken(userId)
+              .then((res) => cb(res.token))
+              .catch(() => {
+                onPlayerError('Spotify token refresh failed');
+              });
+          },
           volume: 0.8,
         });
 
