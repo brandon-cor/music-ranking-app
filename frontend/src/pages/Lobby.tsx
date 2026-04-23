@@ -117,6 +117,9 @@ export default function Lobby() {
 
   const hostConnected = !!users.find((u) => u.id === party.host_id)?.spotify_connected;
 
+  const myPickCount = songs.filter((s) => s.added_by_user_id === currentUser?.id).length;
+  const hasEnoughSongs = myPickCount >= party.songs_per_user;
+
   return (
     <NeroPageShell>
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-6">
@@ -145,13 +148,20 @@ export default function Lobby() {
               >
                 <button
                   type="button"
-                  onClick={() => emitUserReady(!currentUser.is_ready)}
+                  disabled={!hasEnoughSongs}
+                  onClick={() => hasEnoughSongs && emitUserReady(!currentUser.is_ready)}
+                  title={!hasEnoughSongs ? `Add ${party.songs_per_user - myPickCount} more song${party.songs_per_user - myPickCount === 1 ? '' : 's'} to ready up` : undefined}
                   className={`btn-nero-cta min-h-[2.35rem] px-4 py-2 text-xs font-bold uppercase tracking-wide sm:px-5 sm:text-sm ${
                     currentUser.is_ready ? 'bg-accent/20 text-accent' : ''
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
                 >
                   {currentUser.is_ready ? 'Ready ✓' : 'Ready Up'}
                 </button>
+                {!hasEnoughSongs && (
+                  <p className="text-[10px] text-muted">
+                    Add {party.songs_per_user - myPickCount} more song{party.songs_per_user - myPickCount === 1 ? '' : 's'} first
+                  </p>
+                )}
               </motion.div>
             )}
           </div>
