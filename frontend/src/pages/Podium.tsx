@@ -297,29 +297,43 @@ export default function Podium() {
             animate={{ opacity: 1 }}
             className="flex min-h-0 flex-1 flex-col gap-6"
           >
-            <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row lg:items-stretch lg:gap-8">
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:justify-center">
-                <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted lg:mb-4">
-                  Top 3
-                </p>
-                <div className="flex flex-1 items-end justify-center gap-2 sm:gap-4 md:gap-6">
-                  {podiumSlots.map(({ song, rank, height, delay }) => (
-                    <PodiumBlock key={song.id} song={song} rank={rank} heightClass={height} delay={delay} />
-                  ))}
-                </div>
+            <div
+              className={`flex min-h-0 flex-1 flex-col gap-6 ${
+                rest.length > 0
+                  ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-3 xl:grid-cols-[minmax(0,1fr)_20rem]'
+                  : ''
+              }`}
+            >
+              <p
+                className={`mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted ${
+                  rest.length > 0 ? 'lg:col-start-1 lg:row-start-1 lg:mb-0' : ''
+                }`}
+              >
+                Top 3
+              </p>
+              <div
+                className={`flex min-h-0 items-end justify-center gap-2 sm:gap-4 md:gap-6 ${
+                  rest.length > 0 ? 'lg:col-start-1 lg:row-start-2' : ''
+                }`}
+              >
+                {podiumSlots.map(({ song, rank, height, delay }) => (
+                  <PodiumBlock key={song.id} song={song} rank={rank} heightClass={height} delay={delay} />
+                ))}
               </div>
 
               {rest.length > 0 && (
-                <aside className="flex w-full shrink-0 flex-col lg:w-72 xl:w-80">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">
+                <>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted lg:col-start-2 lg:row-start-1 lg:mb-0">
                     Also ranked ({rest.length})
                   </p>
-                  <div className="max-h-[40vh] space-y-2 overflow-y-auto pr-1 lg:max-h-[min(520px,calc(100vh-14rem))]">
-                    {rest.map((song, i) => (
-                      <SideRankRow key={song.id} song={song} rank={4 + i} />
-                    ))}
-                  </div>
-                </aside>
+                  <aside className="flex min-h-0 w-full flex-col lg:col-start-2 lg:row-start-2 lg:w-72 xl:w-80">
+                    <div className="max-h-[40vh] min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-[min(520px,calc(100vh-14rem))]">
+                      {rest.map((song, i) => (
+                        <SideRankRow key={song.id} song={song} rank={4 + i} />
+                      ))}
+                    </div>
+                  </aside>
+                </>
               )}
             </div>
 
