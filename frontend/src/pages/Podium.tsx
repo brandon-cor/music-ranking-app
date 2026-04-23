@@ -7,6 +7,7 @@ import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { getResults } from '../lib/api';
 import { playDrumRoll, playVerdictReveal } from '../lib/audio';
+import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import type { SongResult } from '../types';
 
 type RevealPhase = 'idle' | 'drum_roll' | 'revealed';
@@ -227,15 +228,7 @@ export default function Podium() {
           <h1 className="display-num text-[clamp(40px,10vw,80px)] leading-none text-white">
             THE VERDICT
           </h1>
-          <div className="mt-3 flex justify-center">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="rounded-full border border-border/50 bg-card/60 px-8 py-3 text-sm font-semibold text-white transition hover:bg-card"
-            >
-              Host Another Party
-            </button>
-          </div>
+          {partyId && <PartyCodeEditor partyCode={partyId} className="mt-4 justify-center" />}
         </motion.div>
 
         {phase === 'idle' && (
@@ -348,9 +341,15 @@ export default function Podium() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.45 }}
-              className="flex shrink-0 flex-col items-center border-t border-border/30 pt-6"
+              className="flex shrink-0 justify-center pt-2 sm:pt-4"
             >
-              <p className="display-num text-2xl text-accent sm:text-3xl">That&apos;s a wrap!</p>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="btn-nero-cta px-10 py-3 text-base shadow-[0_0_28px_rgba(0,255,148,0.28)] transition hover:shadow-[0_0_36px_rgba(0,255,148,0.4)]"
+              >
+                Host Another Party
+              </button>
             </motion.div>
           </motion.div>
         )}
