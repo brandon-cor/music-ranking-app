@@ -55,6 +55,8 @@ export default function Player() {
   // stable ref to isHost so the cleanup closure always reads the latest value
   const isHostRef = useRef(isHost);
   isHostRef.current = isHost;
+  // pending abandon timer — cancelled on remount (handles React StrictMode double-invoke)
+  const abandonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const spotifyErrorMessage = localPlayError || sdkSpotifyError;
 
@@ -107,11 +109,21 @@ export default function Player() {
   }, []);
 
   // When the host navigates away from /play via React Router (not a refresh/close),
-  // immediately end the session for all guests.
+  // end the session for all guests. We use a short-lived timer so that React Strict
+  // Mode's intentional mount→cleanup→remount cycle cancels the abandon on remount.
   useEffect(() => {
+    // On mount/remount, cancel any abandon queued by a previous cleanup.
+    if (abandonTimerRef.current !== null) {
+      clearTimeout(abandonTimerRef.current);
+      abandonTimerRef.current = null;
+    }
+
     return () => {
       if (isHostRef.current && !isPageUnloadRef.current) {
-        emitPartyAbandon();
+        abandonTimerRef.current = setTimeout(() => {
+          abandonTimerRef.current = null;
+          emitPartyAbandon();
+        }, 400);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
