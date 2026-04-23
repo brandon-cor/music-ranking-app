@@ -157,11 +157,6 @@ export default function Lobby() {
                 >
                   {currentUser.is_ready ? 'Ready ✓' : 'Ready Up'}
                 </button>
-                {!hasEnoughSongs && (
-                  <p className="text-[10px] text-muted">
-                    Add {party.songs_per_user - myPickCount} more song{party.songs_per_user - myPickCount === 1 ? '' : 's'} first
-                  </p>
-                )}
               </motion.div>
             )}
           </div>
