@@ -173,13 +173,13 @@ export default function Home() {
                   <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
                     Songs per User
                   </label>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="grid grid-cols-10 gap-1">
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                       <button
                         key={n}
                         type="button"
                         onClick={() => setSongsPerUser(n)}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                        className={`flex aspect-square w-full items-center justify-center rounded-full text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-accent/40 ${
                           songsPerUser === n
                             ? 'bg-accent text-white shadow-sm'
                             : 'border border-border/60 bg-background/80 text-muted hover:border-accent/40 hover:text-white'
