@@ -181,16 +181,12 @@ export default function Lobby() {
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">
               Add songs{' '}
               <span className="font-normal text-muted">
-                (up to {party.songs_per_user} picks per person)
+                ({party.songs_per_user} per person · {party.songs_per_user * users.length} total)
               </span>
             </h2>
 
             <div className="min-h-0 flex-1">
-              {currentUser?.spotify_connected ? (
-                <SongSearch partyId={party.id} />
-              ) : (
-                <p className="text-sm italic text-muted">Connect Spotify to search and add tracks.</p>
-              )}
+              <SongSearch partyId={party.id} />
             </div>
           </motion.section>
         </div>

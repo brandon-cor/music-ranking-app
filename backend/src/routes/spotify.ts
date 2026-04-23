@@ -82,8 +82,7 @@ router.get('/token/:userId', async (req, res) => {
 });
 
 // GET /api/spotify/search?q=...&partyId=... — search via the party host's token
-// so guests without their own premium still see results (they still need their
-// own premium auth to actually stream/preview).
+// so guests without Spotify can still suggest tracks (host must connect first).
 router.get('/search', async (req, res) => {
   const { q, partyId } = req.query as { q: string; partyId: string };
 
@@ -100,7 +99,20 @@ router.get('/search', async (req, res) => {
     }
     const hostId = party.host_id;
 
-    let token = await getToken(hostId);
+    let token: string;
+    try {
+      token = await getToken(hostId);
+    } catch {
+      try {
+        token = await refreshToken(hostId);
+      } catch {
+        res.status(503).json({
+          error: 'The host must connect Spotify before anyone can search for songs.',
+        });
+        return;
+      }
+    }
+
     let tracks;
     try {
       tracks = await searchTracks(q, token);
