@@ -21,7 +21,7 @@ export default {
         body: ['Aileron', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        'accent-glow': '0 0 15px rgba(34, 197, 94, 0.35), 0 0 30px rgba(34, 197, 94, 0.15)',
+        'accent-glow': '0 0 8px rgba(34, 197, 94, 0.18)',
         'accent-glow-lg': '0 0 40px rgba(34, 197, 94, 0.25)',
       },
       animation: {

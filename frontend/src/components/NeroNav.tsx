@@ -1,5 +1,6 @@
-// Fixed pill navbar aligned with nero.fan: search, flame wordmark, profile
+// Fixed pill navbar aligned with nero.fan: search, wordmark, profile
 import { useNavigate } from 'react-router-dom';
+import neroLogo from '../nero.png';
 
 function SearchIcon() {
   return (
@@ -15,14 +16,6 @@ function UserIcon() {
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-}
-
-function NeroFlame() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 2c0 0-2 2.5-2 5.5C10 9.5 11 12 12 12s2-1.5 2-4.5C14 4.5 12 2 12 2zm-1.2 8.3C9.5 12.5 8.5 14 8.2 16c-.4 2.5.8 4.8 3.1 5.4 1.1.3 2.1.1 2.7-.1 2.1-.5 3.2-2.2 2.6-4.1-.3-1.1-1-2-1.8-2.6-.2-.1-.3-.2-.3-.2-.1-.1-.1-.1-.1-.1z" />
     </svg>
   );
 }
@@ -48,7 +41,7 @@ export function NeroNav() {
           rel="noreferrer"
           className="flex select-none items-center gap-1.5 text-base font-medium tracking-tight text-white transition hover:opacity-90"
         >
-          <NeroFlame />
+          <img src={neroLogo} alt="" className="h-5 w-5 object-contain" width={20} height={20} aria-hidden />
           <span>nero</span>
         </a>
 

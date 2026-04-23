@@ -5,24 +5,13 @@ import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { ApiError, getParty, getSpotifyToken, spotifyPlay } from '../lib/api';
 import { playRatingOpen, playVoteConfirm } from '../lib/audio';
-import NowPlaying from '../components/NowPlaying';
+import { IPodPlayer } from '../components/IPodPlayer';
+import { RatingPanel } from '../components/RatingPanel';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
-import Countdown from '../components/Countdown';
 import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import type { RatingWindowState, SpotifyPlayer } from '../types';
-
-const RATING_OPTIONS = [
-  { score: 1, emoji: '💀', label: '1 pt' },
-  { score: 3, emoji: '😮', label: '3 pt' },
-  { score: 5, emoji: '🔥', label: '5 pt' },
-] as const;
-
-function emojiForScore(score: number): string {
-  const row = RATING_OPTIONS.find((o) => o.score === score);
-  return row?.emoji ?? '✓';
-}
 
 export default function Player() {
   const { partyId } = useParams<{ partyId: string }>();
@@ -49,6 +38,7 @@ export default function Player() {
 
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [spotifyErrorMessage, setSpotifyErrorMessage] = useState<string | null>(null);
+  const [playerInstance, setPlayerInstance] = useState<SpotifyPlayer | null>(null);
   const playerRef = useRef<SpotifyPlayer | null>(null);
 
   const [votedFlash, setVotedFlash] = useState(false);
@@ -139,6 +129,7 @@ export default function Player() {
           });
 
           playerRef.current = player;
+          setPlayerInstance(player);
         };
 
         if (window.Spotify) {
@@ -149,13 +140,18 @@ export default function Player() {
       } catch {
         console.info('No Spotify token for host — skipping SDK init');
         setSpotifyErrorMessage('Connect Spotify from the lobby before starting songs.');
+        setPlayerInstance(null);
+        playerRef.current = null;
       }
     };
 
-    initPlayer();
+    void initPlayer();
 
     return () => {
-      playerRef.current?.disconnect();
+      const p = playerRef.current;
+      playerRef.current = null;
+      setPlayerInstance(null);
+      p?.disconnect();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHost, partyId]);
@@ -208,6 +204,9 @@ export default function Player() {
 
   const currentOrder = currentSong?.order ?? -1;
   const nextSong = songs.find((s) => s.order === currentOrder + 1) ?? null;
+  const ratingSong = ratingWindow
+    ? (songs.find((s) => s.id === ratingWindow.songId) ?? null)
+    : null;
 
   if (!party) {
     return (
@@ -237,23 +236,8 @@ export default function Player() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {ratingWindow && (
-          <RatingOverlay
-            endsAt={ratingWindow.endsAt}
-            song={songs.find((s) => s.id === ratingWindow.songId) ?? null}
-            hasVoted={hasVoted}
-            votedFlash={votedFlash}
-            lastVoteScore={lastVoteScore}
-            voteCount={voteCount}
-            totalUsers={users.length}
-            onEmojiVote={handleEmojiVote}
-          />
-        )}
-      </AnimatePresence>
-
       <NeroPageShell>
-        <div className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-6">
           <div className="flex flex-col gap-3">
             <Breadcrumbs
               items={[
@@ -280,8 +264,6 @@ export default function Player() {
               )}
             </div>
           </div>
-
-          <NowPlaying song={currentSong} />
 
           {isHost && spotifyErrorMessage && (
             <p className="rounded-2xl border border-orange-700/30 bg-card/50 px-3 py-2 text-xs text-orange-200">
@@ -323,145 +305,40 @@ export default function Player() {
             </div>
           )}
 
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
-            <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
-          </section>
+          <div className="grid gap-6 lg:grid-cols-[minmax(300px,420px)_1fr]">
+            <IPodPlayer song={currentSong} isHost={isHost} player={playerInstance} />
 
-          <section>
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
-              In the room ({users.length})
-            </h2>
-            <UserList
-              users={users}
-              hostId={party.host_id}
-              currentUserId={currentUser?.id ?? null}
-            />
-          </section>
+            <div className="grid min-w-0 gap-6 md:grid-cols-3">
+              <RatingPanel
+                ratingWindow={ratingWindow}
+                song={ratingSong}
+                hasVoted={hasVoted}
+                votedFlash={votedFlash}
+                lastVoteScore={lastVoteScore}
+                voteCount={voteCount}
+                totalUsers={users.length}
+                onEmojiVote={handleEmojiVote}
+              />
+
+              <section className="min-w-0">
+                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
+                <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
+              </section>
+
+              <section className="min-w-0">
+                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
+                  In the room ({users.length})
+                </h2>
+                <UserList
+                  users={users}
+                  hostId={party.host_id}
+                  currentUserId={currentUser?.id ?? null}
+                />
+              </section>
+            </div>
+          </div>
         </div>
       </NeroPageShell>
     </>
-  );
-}
-
-interface RatingOverlayProps {
-  endsAt: number;
-  song: import('../types').Song | null;
-  hasVoted: boolean;
-  votedFlash: boolean;
-  lastVoteScore: number | null;
-  voteCount: number;
-  totalUsers: number;
-  onEmojiVote: (score: number) => void;
-}
-
-function RatingOverlay({
-  endsAt,
-  song,
-  hasVoted,
-  votedFlash,
-  lastVoteScore,
-  voteCount,
-  totalUsers,
-  onEmojiVote,
-}: RatingOverlayProps) {
-  return (
-    <motion.div
-      initial={{ y: '100%', opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: '100%', opacity: 0 }}
-      transition={{ type: 'spring', damping: 22, stiffness: 200 }}
-      className="fixed inset-0 z-[100] flex flex-col bg-background"
-    >
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 pt-10">
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.1, type: 'spring', damping: 15 }}
-        >
-          <h2 className="display-num text-[clamp(48px,12vw,96px)] text-accent glow-accent leading-none">
-            HOT TAKE
-          </h2>
-        </motion.div>
-
-        {song && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center gap-4"
-          >
-            <img
-              src={song.cover_url}
-              alt=""
-              className="w-20 h-20 rounded-xl object-cover shadow-2xl"
-            />
-            <div>
-              <p className="font-black text-xl leading-tight">{song.title}</p>
-              <p className="text-gray-400 text-sm">{song.artist}</p>
-            </div>
-          </motion.div>
-        )}
-
-        <Countdown endsAt={endsAt} />
-
-        <p className="text-gray-500 text-sm">
-          {voteCount} / {totalUsers} voted
-        </p>
-      </div>
-
-      <div className="border-t border-border/30 bg-card/50 p-6 pb-10 backdrop-blur-sm">
-        <AnimatePresence mode="wait">
-          {votedFlash && lastVoteScore != null ? (
-            <motion.div
-              key="voted"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 1.2, opacity: 0 }}
-              className="flex flex-col items-center gap-2 py-4"
-            >
-              <span className="display-num text-6xl text-success glow-accent">YOU VOTED</span>
-              <span className="text-5xl" aria-hidden>
-                {emojiForScore(lastVoteScore)}
-              </span>
-              <span className="text-gray-400 text-sm">
-                <strong className="text-white">{lastVoteScore}</strong> pt locked in
-              </span>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="emoji-pick"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col gap-5"
-            >
-              <p className="text-center text-xs uppercase tracking-widest text-gray-500">
-                Tap one — Skull (1) · Woah (3) · Fire (5)
-              </p>
-              <div className="grid grid-cols-3 gap-3">
-                {RATING_OPTIONS.map(({ score, emoji, label }) => (
-                  <button
-                    key={score}
-                    type="button"
-                    disabled={hasVoted}
-                    onClick={() => onEmojiVote(score)}
-                    className={`flex flex-col items-center justify-center gap-1 rounded-2xl border-2 py-6 px-2 transition active:scale-95 ${
-                      hasVoted
-                        ? 'border-gray-800 bg-gray-900/50 text-gray-600 cursor-not-allowed'
-                        : 'border-white/20 bg-white/5 hover:border-accent/50 hover:bg-accent/10'
-                    }`}
-                  >
-                    <span className="text-4xl" aria-hidden>
-                      {emoji}
-                    </span>
-                    <span className="text-xs font-black uppercase text-gray-400">{label}</span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
   );
 }
