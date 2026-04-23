@@ -1,9 +1,8 @@
-// Spotify search + add-to-queue with a 30s clip start picker (chooser sets start_time_ms).
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { searchSpotify, addSong, spotifyPlay } from '../lib/api';
+// Spotify search + add-to-queue with a 30s clip start picker (chooser sets start_time_ms; no in-app preview).
+import { useState, useRef, useEffect } from 'react';
+import { searchSpotify, addSong } from '../lib/api';
 import type { SpotifyTrack } from '../types';
 import { useParty } from '../context/PartyContext';
-import { useUserSpotifyPlayer } from '../lib/spotify-sdk';
 
 const CLIP_LENGTH_MS = 30_000;
 
@@ -21,17 +20,12 @@ function formatStartLabel(ms: number): string {
 
 export default function SongSearch({ partyId }: SongSearchProps) {
   const { currentUser, addSongToList, songs, party } = useParty();
-  const { deviceId, playerRef, errorMessage: sdkError, clearError } = useUserSpotifyPlayer(
-    currentUser?.id,
-    !!currentUser?.spotify_connected,
-  );
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SpotifyTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [pendingTrack, setPendingTrack] = useState<SpotifyTrack | null>(null);
   const [clipStartMs, setClipStartMs] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,15 +38,6 @@ export default function SongSearch({ partyId }: SongSearchProps) {
     ? Math.max(0, pendingTrack.duration_ms - CLIP_LENGTH_MS)
     : 0;
 
-  const pausePreview = useCallback(async () => {
-    setPreviewingId(null);
-    try {
-      await playerRef.current?.pause();
-    } catch {
-      /* ignore */
-    }
-  }, [playerRef]);
-
   useEffect(() => {
     if (pendingTrack) {
       setClipStartMs(0);
@@ -62,7 +47,6 @@ export default function SongSearch({ partyId }: SongSearchProps) {
   const handleSearch = (q: string) => {
     setQuery(q);
     setError('');
-    clearError();
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!q.trim()) {
@@ -83,25 +67,6 @@ export default function SongSearch({ partyId }: SongSearchProps) {
     }, 400);
   };
 
-  const handlePreview = async () => {
-    if (!currentUser || !pendingTrack || !deviceId) return;
-    const startMs = Math.min(Math.max(0, clipStartMs), maxClipStartMs);
-    playerRef.current?.activateElement();
-    setPreviewingId(pendingTrack.id);
-    setError('');
-    try {
-      await spotifyPlay(
-        currentUser.id,
-        `spotify:track:${pendingTrack.id}`,
-        deviceId,
-        startMs,
-      );
-    } catch (err) {
-      setPreviewingId(null);
-      setError((err as Error).message);
-    }
-  };
-
   const handleConfirmAdd = async () => {
     if (!currentUser || !pendingTrack) return;
     if (atPickLimit) {
@@ -111,7 +76,6 @@ export default function SongSearch({ partyId }: SongSearchProps) {
 
     const startMs = Math.min(Math.max(0, clipStartMs), maxClipStartMs);
 
-    await pausePreview();
     setAddingId(pendingTrack.id);
     try {
       const data = await addSong(partyId, pendingTrack, { id: currentUser.id, name: currentUser.name }, startMs);
@@ -125,8 +89,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
     }
   };
 
-  const handleCancelPending = async () => {
-    await pausePreview();
+  const handleCancelPending = () => {
     setPendingTrack(null);
     setError('');
   };
@@ -154,9 +117,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
         Your picks: <strong className="text-white">{picksUsed}</strong> / {picksCap}
       </p>
 
-      {(error || sdkError) && (
-        <p className="text-red-400 text-xs">{error || sdkError}</p>
-      )}
+      {error && <p className="text-red-400 text-xs">{error}</p>}
 
       {results.length > 0 && (
         <ul className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
@@ -184,7 +145,6 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                     type="button"
                     onClick={() => {
                       if (alreadyAdded || atPickLimit) return;
-                      void pausePreview();
                       setPendingTrack(isPending ? null : track);
                       setError('');
                     }}
@@ -216,8 +176,8 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                 {isPending && (
                   <div className="pl-0 pt-1 border-t border-white/10 mt-1 flex flex-col gap-3">
                     <p className="text-xs text-gray-400">
-                      Pick where your <strong className="text-white">30s</strong> clip starts:{' '}
-                      <strong className="text-accent">{formatStartLabel(clipStartMs)}</strong>
+                      You won&apos;t hear it here—set where your <strong className="text-white">30s</strong> clip should
+                      begin: <strong className="text-accent">{formatStartLabel(clipStartMs)}</strong>
                       {maxClipStartMs === 0 && (
                         <span className="text-gray-500"> (full track under 30s — plays from start)</span>
                       )}
@@ -236,15 +196,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                     <div className="flex flex-wrap gap-2 justify-end">
                       <button
                         type="button"
-                        onClick={() => void handlePreview()}
-                        disabled={!deviceId || previewingId === track.id}
-                        className="rounded px-3 py-1.5 text-xs font-bold text-white border border-accent/50 bg-accent/20 hover:bg-accent/30 disabled:opacity-40"
-                      >
-                        {!deviceId ? 'Preview (connecting…)' : previewingId === track.id ? 'Playing…' : 'Preview clip'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCancelPending()}
+                        onClick={handleCancelPending}
                         className="rounded px-3 py-1.5 text-xs font-bold text-gray-400 border border-border/50 hover:text-white"
                       >
                         Cancel

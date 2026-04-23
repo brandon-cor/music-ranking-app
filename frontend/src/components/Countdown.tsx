@@ -6,19 +6,37 @@ interface CountdownProps {
   onExpire?: () => void;
   /** Smaller readout for inline/narrow columns (e.g. Player rating panel) */
   compact?: boolean;
+  /** Minimal m:ss line only (no tick sounds) — for compact rating strip */
+  variant?: 'default' | 'mmss-tiny';
 }
 
-export default function Countdown({ endsAt, onExpire, compact = false }: CountdownProps) {
+export default function Countdown({
+  endsAt,
+  onExpire,
+  compact = false,
+  variant = 'default',
+}: CountdownProps) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
     Math.max(0, Math.floor((endsAt - Date.now()) / 1000)),
   );
+  const [mmssLabel, setMmssLabel] = useState(() => formatMmss(endsAt));
 
   useEffect(() => {
+    if (variant === 'mmss-tiny') {
+      const tick = () => {
+        const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+        setMmssLabel(formatMmssFromTotalSec(remaining));
+        if (remaining === 0) onExpire?.();
+      };
+      tick();
+      const id = setInterval(tick, 250);
+      return () => clearInterval(id);
+    }
+
     const tick = () => {
       const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
       setSecondsLeft(remaining);
 
-      // play an urgent tick when under 5 seconds
       if (remaining <= 5 && remaining > 0) {
         playTick();
       }
@@ -28,14 +46,19 @@ export default function Countdown({ endsAt, onExpire, compact = false }: Countdo
       }
     };
 
-    tick(); // run immediately
-    const id = setInterval(tick, 250); // update every 250ms for smooth display
+    tick();
+    const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [endsAt, onExpire]);
+  }, [endsAt, onExpire, variant]);
 
-  // color shifts as urgency increases (align with floor-based seconds)
   const isUrgent = secondsLeft < 5;
   const isWarning = secondsLeft < 10 && !isUrgent;
+
+  if (variant === 'mmss-tiny') {
+    return (
+      <p className="text-center text-xs font-semibold tabular-nums tracking-wide text-muted">{mmssLabel}</p>
+    );
+  }
 
   const colorClass = isUrgent
     ? 'text-red-500 glow-red animate-pulse-fast'
@@ -61,4 +84,15 @@ export default function Countdown({ endsAt, onExpire, compact = false }: Countdo
       </span>
     </div>
   );
+}
+
+function formatMmss(endsAt: number): string {
+  const sec = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+  return formatMmssFromTotalSec(sec);
+}
+
+function formatMmssFromTotalSec(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }

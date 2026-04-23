@@ -71,3 +71,56 @@ export function playTick() {
   osc.start(now);
   osc.stop(now + 0.06);
 }
+
+/** Triumphant chord stack for the fire (5 pt) pick */
+export function playFireCelebrate() {
+  const ctx = getCtx();
+  const now = ctx.currentTime;
+  [523.25, 659.25, 783.99].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, now + i * 0.04);
+    gain.gain.setValueAtTime(0, now + i * 0.04);
+    gain.gain.linearRampToValueAtTime(0.12, now + i * 0.04 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc.start(now + i * 0.04);
+    osc.stop(now + 0.5);
+  });
+}
+
+/** Quick bright pop for the woah (3 pt) pick */
+export function playWoahPop() {
+  const ctx = getCtx();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(660, now);
+  osc.frequency.exponentialRampToValueAtTime(990, now + 0.08);
+  gain.gain.setValueAtTime(0.22, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+  osc.start(now);
+  osc.stop(now + 0.22);
+}
+
+/** Low dull thud for the skull (1 pt) pick */
+export function playSkullShame() {
+  const ctx = getCtx();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(110, now);
+  osc.frequency.exponentialRampToValueAtTime(55, now + 0.25);
+  gain.gain.setValueAtTime(0.18, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+  osc.start(now);
+  osc.stop(now + 0.36);
+}

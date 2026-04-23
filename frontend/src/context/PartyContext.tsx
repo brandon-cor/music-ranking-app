@@ -35,6 +35,7 @@ interface PartyContextValue {
   emitSongPlay: (songId: string) => void;
   emitRatingOpen: (songId: string) => void;
   emitRatingSubmit: (songId: string, score: number) => void;
+  emitSongSkip: () => void;
   emitPartyEnd: () => void;
   addSongToList: (song: Song) => void;
   leaveParty: (reasonKey?: string) => void;
@@ -113,6 +114,10 @@ export function PartyProvider({ children }: { children: ReactNode }) {
 
   function emitRatingSubmit(songId: string, score: number) {
     socket.emit('rating:submit', { songId, score });
+  }
+
+  function emitSongSkip() {
+    socket.emit('song:skip');
   }
 
   function emitPartyEnd() {
@@ -247,6 +252,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     emitSongPlay,
     emitRatingOpen,
     emitRatingSubmit,
+    emitSongSkip,
     emitPartyEnd,
     addSongToList,
     leaveParty,

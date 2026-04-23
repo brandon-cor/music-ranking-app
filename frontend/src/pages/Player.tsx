@@ -5,9 +5,10 @@ import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { ApiError, getParty, spotifyPlay } from '../lib/api';
 import { useUserSpotifyPlayer } from '../lib/spotify-sdk';
-import { playRatingOpen, playVoteConfirm } from '../lib/audio';
+import { playRatingOpen } from '../lib/audio';
 import { IPodPlayer } from '../components/IPodPlayer';
 import { RatingPanel } from '../components/RatingPanel';
+import { VoteCelebration, type CelebrationScore } from '../components/VoteCelebration';
 import StartCountdown from '../components/StartCountdown';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
@@ -26,7 +27,6 @@ export default function Player() {
     currentSong,
     ratingWindow,
     hasVoted,
-    voteCount,
     isHost,
     setParty,
     setCurrentUser,
@@ -34,6 +34,7 @@ export default function Player() {
     emitSongPlay,
     emitRatingOpen,
     emitRatingSubmit,
+    emitSongSkip,
     emitPartyEnd,
     leaveParty,
   } = useParty();
@@ -48,10 +49,11 @@ export default function Player() {
 
   const spotifyErrorMessage = localPlayError || sdkSpotifyError;
 
-  const [votedFlash, setVotedFlash] = useState(false);
-  const [lastVoteScore, setLastVoteScore] = useState<number | null>(null);
+  const [celebrationScore, setCelebrationScore] = useState<CelebrationScore | null>(null);
   const [missedVote, setMissedVote] = useState(false);
   const prevRatingWindowRef = useRef<RatingWindowState | null>(null);
+  const wasRatingOpenRef = useRef(false);
+  const handlePlaySongRef = useRef<(songId: string) => Promise<void>>(async () => {});
 
   // restore session on refresh
   useEffect(() => {
@@ -156,24 +158,49 @@ export default function Player() {
   useEffect(() => {
     if (ratingWindow) {
       playRatingOpen();
-      setVotedFlash(false);
-      setLastVoteScore(null);
     }
   }, [ratingWindow]);
 
-  const handlePlaySong = async (songId: string) => {
-    const song = songs.find((s) => s.id === songId);
-    if (!song || !currentUser?.id) return;
+  const handlePlaySong = useCallback(
+    async (songId: string) => {
+      const song = songs.find((s) => s.id === songId);
+      if (!song || !currentUser?.id) return;
 
-    if (!deviceId) {
-      setLocalPlayError(
-        'Spotify player is not ready yet. Make sure the host browser supports Spotify playback and reconnect Spotify.',
-      );
-      return;
-    }
+      if (!deviceId) {
+        setLocalPlayError(
+          'Spotify player is not ready yet. Make sure the host browser supports Spotify playback and reconnect Spotify.',
+        );
+        return;
+      }
 
+      playerRef.current?.activateElement();
+
+      try {
+        await spotifyPlay(
+          currentUser.id,
+          `spotify:track:${song.spotify_id}`,
+          deviceId,
+          song.start_time_ms ?? 0,
+        );
+        setLocalPlayError(null);
+        clearError();
+        emitSongPlay(songId);
+      } catch (err) {
+        console.warn('Spotify play failed:', err);
+        setLocalPlayError(
+          'Could not start Spotify playback. Open Spotify on the host browser, then try starting the song again.',
+        );
+      }
+    },
+    [songs, currentUser?.id, deviceId, playerRef, clearError, emitSongPlay],
+  );
+
+  handlePlaySongRef.current = handlePlaySong;
+
+  const handleReplayClip = useCallback(async () => {
+    const song = currentSong;
+    if (!song || !currentUser?.id || !deviceId) return;
     playerRef.current?.activateElement();
-
     try {
       await spotifyPlay(
         currentUser.id,
@@ -183,28 +210,43 @@ export default function Player() {
       );
       setLocalPlayError(null);
       clearError();
-      emitSongPlay(songId);
     } catch (err) {
-      console.warn('Spotify play failed:', err);
-      setLocalPlayError(
-        'Could not start Spotify playback. Open Spotify on the host browser, then try starting the song again.',
-      );
+      console.warn('Replay clip failed:', err);
+      setLocalPlayError('Could not replay from the clip start. Try again.');
     }
-  };
+  }, [currentSong, currentUser?.id, deviceId, playerRef, clearError]);
+
+  const dismissCelebration = useCallback(() => {
+    setCelebrationScore(null);
+  }, []);
+
+  useEffect(() => {
+    const justClosed = wasRatingOpenRef.current && ratingWindow === null;
+    wasRatingOpenRef.current = ratingWindow !== null;
+
+    if (!justClosed || !isHost || !currentSong) return;
+
+    const next = songs.find((s) => s.order === currentSong.order + 1) ?? null;
+    const t = window.setTimeout(() => {
+      if (!next) {
+        emitPartyEnd();
+        return;
+      }
+      void handlePlaySongRef.current(next.id);
+    }, 0);
+
+    return () => window.clearTimeout(t);
+  }, [ratingWindow, currentSong, isHost, songs, emitPartyEnd]);
 
   const handleEmojiVote = (score: number) => {
     if (!ratingWindow || hasVoted) return;
-    emitRatingSubmit(ratingWindow.songId, score);
-    setLastVoteScore(score);
-    setVotedFlash(true);
-    playVoteConfirm();
+    const normalized: CelebrationScore = score === 1 || score === 5 ? score : 3;
+    emitRatingSubmit(ratingWindow.songId, normalized);
+    setCelebrationScore(normalized);
   };
 
   const currentOrder = currentSong?.order ?? -1;
   const nextSong = songs.find((s) => s.order === currentOrder + 1) ?? null;
-  const ratingSong = ratingWindow
-    ? (songs.find((s) => s.id === ratingWindow.songId) ?? null)
-    : null;
 
   if (!party) {
     return (
@@ -223,6 +265,10 @@ export default function Player() {
           <StartCountdown key="start-countdown" onComplete={onStartCountdownComplete} />
         )}
       </AnimatePresence>
+
+      {celebrationScore !== null && (
+        <VoteCelebration score={celebrationScore} onDone={dismissCelebration} />
+      )}
 
       <AnimatePresence>
         {missedVote && (
@@ -310,19 +356,17 @@ export default function Player() {
           )}
 
           <div className="grid gap-6 lg:grid-cols-[minmax(300px,420px)_1fr]">
-            <IPodPlayer song={currentSong} isHost={isHost} player={playerInstance} />
+            <IPodPlayer
+              song={currentSong}
+              isHost={isHost}
+              player={playerInstance}
+              onReplayClip={isHost ? () => void handleReplayClip() : undefined}
+              onSkipRating={isHost ? emitSongSkip : undefined}
+              showSkip={!!ratingWindow}
+            />
 
             <div className="grid min-w-0 gap-6 md:grid-cols-3">
-              <RatingPanel
-                ratingWindow={ratingWindow}
-                song={ratingSong}
-                hasVoted={hasVoted}
-                votedFlash={votedFlash}
-                lastVoteScore={lastVoteScore}
-                voteCount={voteCount}
-                totalUsers={users.length}
-                onEmojiVote={handleEmojiVote}
-              />
+              <RatingPanel ratingWindow={ratingWindow} hasVoted={hasVoted} onEmojiVote={handleEmojiVote} />
 
               <section className="min-w-0">
                 <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>

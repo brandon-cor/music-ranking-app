@@ -4,11 +4,38 @@ import { toSafeParty, toSafeUser } from '../lib/serialize';
 
 // one timer per party — tracks the active rating window
 const ratingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// prevents duplicate rating:close when the last two votes land in the same tick
+const ratingFinalizedKeys = new Set<string>();
 
 // grace period for host reconnects (page refresh / quick nav). if the host
 // doesn't come back within this window, the party is considered abandoned.
 const HOST_DISCONNECT_GRACE_MS = 5000;
 const hostGraceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function clearRatingTimer(partyId: string) {
+  const existing = ratingTimers.get(partyId);
+  if (existing) clearTimeout(existing);
+  ratingTimers.delete(partyId);
+}
+
+/** Ends the rating window for one song: clears timer, emits rating:close once per song. */
+async function finalizeRatingWindow(
+  io: Server,
+  partyId: string,
+  songId: string,
+  showScores: boolean,
+) {
+  const dedupeKey = `${partyId}:${songId}`;
+  if (ratingFinalizedKeys.has(dedupeKey)) return;
+  ratingFinalizedKeys.add(dedupeKey);
+  clearRatingTimer(partyId);
+
+  let scores: { songId: string; avgScore: number; voteCount: number } | null = null;
+  if (showScores) {
+    scores = await getSongScores(partyId, songId);
+  }
+  io.to(`party:${partyId}`).emit('rating:close', { songId, scores });
+}
 
 export function setupSocket(io: Server) {
   io.on('connection', (socket: Socket) => {
@@ -114,9 +141,8 @@ export function setupSocket(io: Server) {
       const party = await prisma.party.findUnique({ where: { id: partyId } });
       if (!party || party.host_id !== userId) return;
 
-      // cancel any existing timer for this party (shouldn't happen but be safe)
-      const existing = ratingTimers.get(partyId);
-      if (existing) clearTimeout(existing);
+      ratingFinalizedKeys.delete(`${partyId}:${songId}`);
+      clearRatingTimer(partyId);
 
       const durationMs = party.rating_window_seconds * 1000;
       const endsAt = Date.now() + durationMs;
@@ -127,20 +153,27 @@ export function setupSocket(io: Server) {
         duration: party.rating_window_seconds,
       });
 
-      // auto-close when time runs out
-      const timer = setTimeout(async () => {
-        ratingTimers.delete(partyId);
-
-        // calculate interim results if show_scores is on
-        let scores: { songId: string; avgScore: number; voteCount: number } | null = null;
-        if (party.show_scores) {
-          scores = await getSongScores(partyId, songId);
-        }
-
-        io.to(`party:${partyId}`).emit('rating:close', { songId, scores });
+      const timer = setTimeout(() => {
+        void finalizeRatingWindow(io, partyId, songId, party.show_scores);
       }, durationMs);
 
       ratingTimers.set(partyId, timer);
+    });
+
+    // song:skip — host ends the rating window early (same payload as timer close)
+    socket.on('song:skip', async () => {
+      const { partyId, userId } = socket.data as { partyId: string; userId: string };
+      if (!partyId || !userId) return;
+
+      if (!ratingTimers.has(partyId)) return;
+
+      const party = await prisma.party.findUnique({ where: { id: partyId } });
+      if (!party || party.host_id !== userId) return;
+
+      const songId = party.current_song_id;
+      if (!songId) return;
+
+      await finalizeRatingWindow(io, partyId, songId, party.show_scores);
     });
 
     // rating:submit — user submits their score for the current song
@@ -166,6 +199,18 @@ export function setupSocket(io: Server) {
           // broadcast vote count so everyone can see the tally
           const voteCount = await prisma.rating.count({ where: { song_id: songId } });
           io.to(`party:${partyId}`).emit('rating:tally', { songId, voteCount });
+
+          const partyFull = await prisma.party.findUnique({
+            where: { id: partyId },
+            include: { users: true },
+          });
+          if (
+            partyFull &&
+            partyFull.users.length > 0 &&
+            voteCount >= partyFull.users.length
+          ) {
+            await finalizeRatingWindow(io, partyId, songId, partyFull.show_scores);
+          }
         } catch (error) {
           console.error('rating:submit error', error);
         }

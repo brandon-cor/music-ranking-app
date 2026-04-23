@@ -100,6 +100,21 @@ export async function searchTracks(query: string, token: string) {
   return data.tracks.items;
 }
 
+/** Move playback to the Web Playback SDK device before starting a track (often required for play to work). */
+export async function transferPlayback(token: string, deviceId: string): Promise<void> {
+  const res = await fetch(`${SPOTIFY_API_BASE}/me/player`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ device_ids: [deviceId], play: false }),
+  });
+  if (res.ok || res.status === 204) return;
+  const body = await res.text().catch(() => '');
+  throw new Error(`Spotify transfer ${res.status}: ${body}`);
+}
+
 export async function playTrack(
   token: string,
   spotifyUri: string,

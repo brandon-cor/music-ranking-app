@@ -10,6 +10,7 @@ import {
   refreshToken,
   searchTracks,
   playTrack,
+  transferPlayback,
 } from '../lib/spotify';
 
 const router = Router();
@@ -135,11 +136,17 @@ router.post('/play', async (req, res) => {
   try {
     let token = await getToken(userId);
     const startMs = positionMs ?? 0;
+
+    const transferAndPlay = async (t: string) => {
+      await transferPlayback(t, deviceId);
+      await playTrack(t, spotifyUri, deviceId, startMs);
+    };
+
     try {
-      await playTrack(token, spotifyUri, deviceId, startMs);
+      await transferAndPlay(token);
     } catch {
       token = await refreshToken(userId);
-      await playTrack(token, spotifyUri, deviceId, startMs);
+      await transferAndPlay(token);
     }
     res.json({ ok: true });
   } catch (error) {

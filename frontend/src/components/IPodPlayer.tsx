@@ -31,9 +31,21 @@ export interface IPodPlayerProps {
   song: Song | null;
   isHost: boolean;
   player: SpotifyPlayer | null;
+  /** Seek back to the party clip start (host only). */
+  onReplayClip?: () => void;
+  /** End the rating window early (host only, while rating is open). */
+  onSkipRating?: () => void;
+  showSkip?: boolean;
 }
 
-export function IPodPlayer({ song, isHost, player }: IPodPlayerProps) {
+export function IPodPlayer({
+  song,
+  isHost,
+  player,
+  onReplayClip,
+  onSkipRating,
+  showSkip = false,
+}: IPodPlayerProps) {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(true);
@@ -82,6 +94,8 @@ export function IPodPlayer({ song, isHost, player }: IPodPlayerProps) {
   const showProgress = isHost && duration > 0;
   const progressPct = showProgress ? Math.min(100, (position / duration) * 100) : 0;
   const canToggle = isHost && !!player && !!song;
+  const canReplay = isHost && !!onReplayClip && !!song;
+  const canSkip = isHost && showSkip && !!onSkipRating;
 
   const handlePlayPause = () => {
     if (!canToggle) return;
@@ -142,13 +156,26 @@ export function IPodPlayer({ song, isHost, player }: IPodPlayerProps) {
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-center">
+      <div className="mt-5 flex items-center justify-center gap-4 sm:gap-6">
+        <button
+          type="button"
+          disabled={!canReplay}
+          onClick={() => onReplayClip?.()}
+          aria-label="Replay clip from start"
+          title="Replay 30s clip from your chosen start"
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-800/90 text-zinc-200 shadow-md transition active:scale-95 ${
+            canReplay ? 'hover:bg-zinc-700' : 'cursor-not-allowed opacity-35'
+          }`}
+        >
+          <ReplayIcon />
+        </button>
+
         <button
           type="button"
           disabled={!canToggle}
           onClick={handlePlayPause}
           aria-label={paused ? 'Play' : 'Pause'}
-          className={`flex h-20 w-20 items-center justify-center rounded-full bg-white shadow-[0_4px_8px_rgba(0,0,0,0.25),inset_0_-2px_4px_rgba(0,0,0,0.08)] transition active:scale-95 ${
+          className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_4px_8px_rgba(0,0,0,0.25),inset_0_-2px_4px_rgba(0,0,0,0.08)] transition active:scale-95 ${
             canToggle ? 'hover:bg-zinc-100' : 'cursor-not-allowed opacity-40'
           }`}
         >
@@ -161,7 +188,37 @@ export function IPodPlayer({ song, isHost, player }: IPodPlayerProps) {
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          disabled={!canSkip}
+          onClick={() => onSkipRating?.()}
+          aria-label="Skip rating and go to next song"
+          title="Skip rating (host)"
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-800/90 text-zinc-200 shadow-md transition active:scale-95 ${
+            canSkip ? 'hover:bg-zinc-700' : 'cursor-not-allowed opacity-35'
+          }`}
+        >
+          <SkipIcon />
+        </button>
       </div>
     </div>
+  );
+}
+
+function ReplayIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M3 12a9 9 0 1 1 3 7.5" strokeLinecap="round" />
+      <path d="M3 16v-4h4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SkipIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M7 6v12l10-6L7 6zm10 0h2v12h-2V6z" />
+    </svg>
   );
 }
