@@ -10,12 +10,12 @@ interface CountdownProps {
 
 export default function Countdown({ endsAt, onExpire, compact = false }: CountdownProps) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
-    Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)),
+    Math.max(0, Math.floor((endsAt - Date.now()) / 1000)),
   );
 
   useEffect(() => {
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
       setSecondsLeft(remaining);
 
       // play an urgent tick when under 5 seconds
@@ -33,9 +33,9 @@ export default function Countdown({ endsAt, onExpire, compact = false }: Countdo
     return () => clearInterval(id);
   }, [endsAt, onExpire]);
 
-  // color shifts as urgency increases
-  const isUrgent = secondsLeft <= 5;
-  const isWarning = secondsLeft <= 10 && !isUrgent;
+  // color shifts as urgency increases (align with floor-based seconds)
+  const isUrgent = secondsLeft < 5;
+  const isWarning = secondsLeft < 10 && !isUrgent;
 
   const colorClass = isUrgent
     ? 'text-red-500 glow-red animate-pulse-fast'

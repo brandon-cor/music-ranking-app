@@ -1,4 +1,4 @@
-// Inline HOT TAKE, countdown, and emoji vote UI (replaces full-screen rating overlay on Player)
+// Inline nero.party rating panel — countdown and emoji vote UI (replaces full-screen rating overlay on Player)
 import { motion, AnimatePresence } from 'framer-motion';
 import type { RatingWindowState, Song } from '../types';
 import { emojiForScore, RATING_OPTIONS } from '../lib/ratingOptions';
@@ -37,7 +37,7 @@ export function RatingPanel({
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-border/30 bg-card/50 p-4">
       <div>
-        <h2 className="display-num text-2xl leading-none text-accent sm:text-3xl">HOT TAKE</h2>
+        <h2 className="display-num text-2xl leading-none text-accent sm:text-3xl">nero.party</h2>
         {song && (
           <p className="mt-2 line-clamp-2 text-sm font-semibold text-white" title={song.title}>
             {song.title}
