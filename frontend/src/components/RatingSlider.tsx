@@ -36,7 +36,7 @@ export default function RatingSlider({ value, onChange, disabled }: RatingSlider
       <div className="text-center">
         <span
           className={`display-num text-6xl transition-colors duration-200 ${
-            value >= 75 ? 'text-gold glow-gold' : value >= 50 ? 'text-yellow-300' : 'text-gray-400'
+            value >= 75 ? 'glow-accent text-accent' : value >= 50 ? 'text-emerald-300' : 'text-gray-400'
           }`}
         >
           {activeLabel.label}
@@ -47,7 +47,7 @@ export default function RatingSlider({ value, onChange, disabled }: RatingSlider
       <div className="text-center">
         <span
           className={`display-num text-8xl tabular-nums transition-colors duration-200 ${
-            value >= 75 ? 'text-gold' : value >= 50 ? 'text-yellow-200' : 'text-gray-300'
+            value >= 75 ? 'text-accent' : value >= 50 ? 'text-emerald-200' : 'text-gray-300'
           }`}
         >
           {value}
@@ -80,7 +80,7 @@ export default function RatingSlider({ value, onChange, disabled }: RatingSlider
             key={l.value}
             onClick={() => !disabled && onChange(l.value)}
             className={`text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
-              activeLabel.value === l.value ? 'text-gold' : 'text-gray-500'
+              activeLabel.value === l.value ? 'text-accent' : 'text-gray-500'
             } ${disabled ? 'cursor-default' : 'cursor-pointer hover:text-gray-300'}`}
           >
             {l.label}

@@ -5,7 +5,7 @@ A real-time song-rating party app. The host queues tracks from Spotify, guests j
 ## Stack
 
 - **Backend**: Node.js, Express, Socket.IO, Prisma (SQLite), TypeScript
-- **Frontend**: React, Vite, Tailwind CSS, Framer Motion, TypeScript
+- **Frontend**: React, Vite, Tailwind CSS, Framer Motion, TypeScript (UI aligned with [nero.fan](https://www.nero.fan/): Aileron, charcoal surfaces, green accent `#22c55e`, pill nav + CTA)
 - **Auth / Playback**: Spotify OAuth + Spotify Web Playback SDK (host needs Spotify Premium)
 
 ## Running locally
@@ -62,7 +62,7 @@ nero-party/
 ├── frontend/             Vite + React + Tailwind client
 │   └── src/
 │       ├── pages/        Top-level routes (Home, Lobby, Player, Podium)
-│       ├── components/   Reusable UI (Queue, RatingSlider, Breadcrumbs…)
+│       ├── components/   Reusable UI (NeroNav, NeroPageShell, WireframeBackground, Queue, RatingSlider, Breadcrumbs…)
 │       ├── context/      PartyContext — shared live-party state
 │       ├── lib/          API client, socket singleton, audio helpers
 │       └── types/        Shared TypeScript interfaces

@@ -27,7 +27,10 @@ export default function UserList({ users, hostId, currentUserId }: UserListProps
   return (
     <div className="flex flex-wrap gap-2">
       {users.map((user) => (
-        <div key={user.id} className="flex items-center gap-2 bg-white/5 rounded-full px-3 py-1.5">
+        <div
+          key={user.id}
+          className="flex items-center gap-2 rounded-full border border-border/30 bg-card/40 px-3 py-1.5"
+        >
           <span
             className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${avatarColor(user.id)}`}
           >
@@ -36,7 +39,7 @@ export default function UserList({ users, hostId, currentUserId }: UserListProps
           <span className="text-sm font-medium text-gray-300">
             {user.name}
             {user.id === hostId && (
-              <span className="ml-1 text-gold text-xs">👑</span>
+              <span className="ml-1 text-xs text-accent">👑</span>
             )}
             {user.id === currentUserId && (
               <span className="ml-1 text-gray-500 text-xs">(you)</span>

@@ -24,7 +24,7 @@ export function Breadcrumbs({ items, className = '' }: BreadcrumbsProps) {
             {item.to && !isLast ? (
               <Link
                 to={item.to}
-                className="rounded text-gray-400 transition hover:text-gold focus:outline-none focus:ring-2 focus:ring-gold/40"
+                className="rounded text-gray-400 transition hover:text-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
               >
                 {item.label}
               </Link>

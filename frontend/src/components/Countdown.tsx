@@ -39,7 +39,7 @@ export default function Countdown({ endsAt, onExpire }: CountdownProps) {
     ? 'text-red-500 glow-red animate-pulse-fast'
     : isWarning
       ? 'text-orange-400'
-      : 'text-gold';
+      : 'text-accent glow-accent';
 
   return (
     <div className="flex flex-col items-center gap-1">

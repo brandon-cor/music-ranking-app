@@ -1,12 +1,13 @@
+// Landing: create or join a party; styled to feel like a nero.fan subpage
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { createParty, joinParty } from '../lib/api';
 import { useParty } from '../context/PartyContext';
+import { NeroPageShell } from '../components/NeroPageShell';
 
 type Tab = 'create' | 'join';
 
-// human-readable explanations for the ?reason= we land back here with
 const REASON_MESSAGES: Record<string, string> = {
   host_left: 'The host left, so the party has been closed.',
   ended: 'That party has already ended.',
@@ -24,7 +25,6 @@ export default function Home() {
   const reason = searchParams.get('reason');
   const reasonMessage = reason ? REASON_MESSAGES[reason] : null;
 
-  // clear ?reason from the url after the user sees it once
   useEffect(() => {
     if (!reason) return;
     const timer = setTimeout(() => {
@@ -36,14 +36,12 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reason]);
 
-  // create form
   const [partyName, setPartyName] = useState('');
   const [hostName, setHostName] = useState('');
   const [ratingWindow, setRatingWindow] = useState(30);
   const [maxSongs, setMaxSongs] = useState(20);
   const [showScores, setShowScores] = useState(false);
 
-  // join form
   const [partyCode, setPartyCode] = useState('');
   const [guestName, setGuestName] = useState('');
 
@@ -84,7 +82,6 @@ export default function Home() {
       setCurrentUser(user);
       joinRoom(party.id, user.id);
 
-      // send to wherever the party currently is
       if (party.status === 'ended') {
         navigate(`/party/${party.id}/podium`);
       } else if (party.status === 'playing') {
@@ -100,163 +97,164 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6">
-      {/* hero */}
-      <motion.div
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="text-center mb-12"
-      >
-        <h1 className="display-num text-[clamp(64px,15vw,140px)] leading-none glow-gold text-gold">
-          NERO PARTY
-        </h1>
-        <p className="text-gray-400 text-lg mt-2 font-medium">
-          Rate songs. Settle debates. Crown the banger.
-        </p>
-      </motion.div>
-
-      {reasonMessage && (
+    <NeroPageShell>
+      <div className="flex min-h-[calc(100vh-5rem)] flex-col items-center justify-center px-6 py-8">
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 w-full max-w-md rounded-xl border border-orange-700/40 bg-orange-900/20 px-4 py-3 text-sm text-orange-200"
-          role="alert"
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="mb-10 text-center"
         >
-          {reasonMessage}
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-muted">
+            Party
+          </p>
+          <h1 className="display-num text-[clamp(2.5rem,12vw,5rem)] leading-[0.95] text-white">
+            nero
+            <span className="text-accent">.</span>party
+          </h1>
+          <p className="mt-3 max-w-sm text-balance text-sm text-muted">
+            Rate songs. Settle debates. Crown the banger.
+          </p>
         </motion.div>
-      )}
 
-      {/* card */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl overflow-hidden"
-      >
-        {/* tabs */}
-        <div className="flex">
-          {(['create', 'join'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => { setTab(t); setError(''); }}
-              className={`flex-1 py-4 text-sm font-bold uppercase tracking-widest transition-colors ${
-                tab === t
-                  ? 'bg-gold text-black'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {t === 'create' ? '🎉 Host a Party' : '🎵 Join a Party'}
-            </button>
-          ))}
-        </div>
+        {reasonMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 w-full max-w-md rounded-2xl border border-orange-700/30 bg-card/60 px-4 py-3 text-sm text-orange-200"
+            role="alert"
+          >
+            {reasonMessage}
+          </motion.div>
+        )}
 
-        <div className="p-6">
-          {tab === 'create' ? (
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
-              <Field
-                label="Party Name"
-                value={partyName}
-                onChange={setPartyName}
-                placeholder="e.g. Friday Night Bangers"
-              />
-              <Field
-                label="Your Name"
-                value={hostName}
-                onChange={setHostName}
-                placeholder="e.g. DJ Nero"
-              />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.1 }}
+          className="w-full max-w-md overflow-hidden rounded-3xl border border-border/50 bg-card/80 shadow-xl backdrop-blur-sm"
+        >
+          <div className="inline-flex w-full p-1">
+            {(['create', 'join'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  setTab(t);
+                  setError('');
+                }}
+                className={`flex-1 rounded-full py-2.5 text-center text-xs font-semibold uppercase tracking-widest transition ${
+                  tab === t
+                    ? 'bg-foreground/10 text-white ring-1 ring-[#00ff94]/20'
+                    : 'text-muted hover:text-foreground/90'
+                }`}
+              >
+                {t === 'create' ? 'Host a Party' : 'Join a Party'}
+              </button>
+            ))}
+          </div>
 
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1.5">
-                    Rating Window
-                  </label>
-                  <div className="flex items-center gap-2">
+          <div className="border-t border-border/30 p-6">
+            {tab === 'create' ? (
+              <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                <Field
+                  label="Party Name"
+                  value={partyName}
+                  onChange={setPartyName}
+                  placeholder="e.g. Friday Night Bangers"
+                />
+                <Field
+                  label="Your Name"
+                  value={hostName}
+                  onChange={setHostName}
+                  placeholder="e.g. DJ Nero"
+                />
+
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                      Rating Window
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min={15}
+                        max={60}
+                        step={5}
+                        value={ratingWindow}
+                        onChange={(e) => setRatingWindow(Number(e.target.value))}
+                        className="h-1.5 flex-1 appearance-none rounded-full accent-green-500"
+                      />
+                      <span className="w-12 text-right text-sm font-semibold text-accent">
+                        {ratingWindow}s
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="w-28">
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                      Max Songs
+                    </label>
                     <input
-                      type="range"
-                      min={15}
-                      max={60}
-                      step={5}
-                      value={ratingWindow}
-                      onChange={(e) => setRatingWindow(Number(e.target.value))}
-                      className="flex-1 accent-gold"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={maxSongs}
+                      onChange={(e) => setMaxSongs(Number(e.target.value))}
+                      className="w-full rounded-xl border border-border/60 bg-background/80 px-3 py-2 text-center text-sm text-white focus:border-accent/60 focus:outline-none"
                     />
-                    <span className="text-gold font-bold text-sm w-12 text-right">{ratingWindow}s</span>
                   </div>
                 </div>
 
-                <div className="w-28">
-                  <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1.5">
-                    Max Songs
-                  </label>
+                <label className="flex cursor-pointer select-none items-center gap-3">
                   <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={maxSongs}
-                    onChange={(e) => setMaxSongs(Number(e.target.value))}
-                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold/60 text-center"
+                    type="checkbox"
+                    checked={showScores}
+                    onChange={(e) => setShowScores(e.target.checked)}
+                    className="h-4 w-4 rounded accent-green-500"
                   />
-                </div>
-              </div>
+                  <span className="text-sm text-foreground/80">
+                    Show scores mid-party
+                    <span className="ml-1 text-xs text-muted">(off = full reveal at the end)</span>
+                  </span>
+                </label>
 
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showScores}
-                  onChange={(e) => setShowScores(e.target.checked)}
-                  className="w-4 h-4 accent-gold rounded"
+                {error && <p className="text-sm text-red-400">{error}</p>}
+
+                <button type="submit" disabled={loading} className="btn-nero-cta w-full disabled:cursor-not-allowed">
+                  {loading ? 'Creating…' : 'Create Party'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleJoin} className="flex flex-col gap-4">
+                <Field
+                  label="Party Code"
+                  value={partyCode}
+                  onChange={setPartyCode}
+                  placeholder="Paste the party ID here"
                 />
-                <span className="text-sm text-gray-300">
-                  Show scores mid-party{' '}
-                  <span className="text-gray-600 text-xs">(off = full reveal at the end)</span>
-                </span>
-              </label>
+                <Field
+                  label="Your Name"
+                  value={guestName}
+                  onChange={setGuestName}
+                  placeholder="e.g. Music Fan"
+                />
 
-              {error && <p className="text-red-400 text-sm">{error}</p>}
+                {error && <p className="text-sm text-red-400">{error}</p>}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-2 bg-gold text-black font-black text-lg py-3 rounded-xl uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition disabled:opacity-50 disabled:cursor-wait"
-              >
-                {loading ? 'Creating…' : 'Create Party'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleJoin} className="flex flex-col gap-4">
-              <Field
-                label="Party Code"
-                value={partyCode}
-                onChange={setPartyCode}
-                placeholder="Paste the party ID here"
-              />
-              <Field
-                label="Your Name"
-                value={guestName}
-                onChange={setGuestName}
-                placeholder="e.g. Music Fan"
-              />
+                <button type="submit" disabled={loading} className="btn-nero-cta w-full">
+                  {loading ? 'Joining…' : 'Join Party'}
+                </button>
+              </form>
+            )}
+          </div>
+        </motion.div>
 
-              {error && <p className="text-red-400 text-sm">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-2 bg-gold text-black font-black text-lg py-3 rounded-xl uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition disabled:opacity-50 disabled:cursor-wait"
-              >
-                {loading ? 'Joining…' : 'Join Party'}
-              </button>
-            </form>
-          )}
-        </div>
-      </motion.div>
-
-      <p className="mt-8 text-gray-700 text-xs text-center max-w-xs">
-        Host needs Spotify Premium to play music. Guests just need a name.
-      </p>
-    </div>
+        <p className="mt-8 max-w-xs text-center text-xs text-muted">
+          Host needs Spotify Premium to play music. Guests just need a name.
+        </p>
+      </div>
+    </NeroPageShell>
   );
 }
 
@@ -273,7 +271,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1.5">
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
         {label}
       </label>
       <input
@@ -281,7 +279,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gold/60 focus:bg-white/15 transition"
+        className="w-full rounded-xl border border-border/60 bg-background/80 px-4 py-3 text-sm text-white shadow-inner placeholder:text-foreground/35 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
       />
     </div>
   );

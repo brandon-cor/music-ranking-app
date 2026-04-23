@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { ApiError, getParty, getSpotifyToken, spotifyPlay } from '../lib/api';
 import { playRatingOpen, playVoteConfirm } from '../lib/audio';
@@ -210,14 +211,16 @@ export default function Player() {
 
   if (!party) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-gray-500 animate-pulse">Loading…</p>
-      </div>
+      <NeroPageShell>
+        <div className="flex min-h-[50vh] items-center justify-center p-6">
+          <p className="text-muted animate-pulse">Loading…</p>
+        </div>
+      </NeroPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <>
       <AnimatePresence>
         {missedVote && (
           <motion.div
@@ -225,7 +228,7 @@ export default function Player() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 px-6"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 px-6"
           >
             <p className="text-center text-xl font-black uppercase tracking-wide text-fiery">
               Too slow! You missed your time.
@@ -249,93 +252,95 @@ export default function Player() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
-        <div className="flex flex-col gap-3">
-          <Breadcrumbs
-            items={[
-              { label: 'Home', to: '/' },
-              { label: party.name, to: `/party/${partyId}/lobby` },
-              { label: 'Live' },
-            ]}
-          />
+      <NeroPageShell>
+        <div className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-6">
+          <div className="flex flex-col gap-3">
+            <Breadcrumbs
+              items={[
+                { label: 'Home', to: '/' },
+                { label: party.name, to: `/party/${partyId}/lobby` },
+                { label: 'Live' },
+              ]}
+            />
 
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-gold text-xs font-bold uppercase tracking-widest">Live</p>
-              <h1 className="display-num text-3xl">{party.name}</h1>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-accent">Live</p>
+                <h1 className="display-num text-3xl text-white">{party.name}</h1>
+              </div>
+              {partyId && <PartyCodeEditor partyCode={partyId} />}
+              {isHost && (
+                <button
+                  type="button"
+                  onClick={emitPartyEnd}
+                  className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted transition hover:border-red-900/60 hover:text-red-400"
+                >
+                  End Party
+                </button>
+              )}
             </div>
-            {partyId && <PartyCodeEditor partyCode={partyId} />}
-            {isHost && (
-              <button
-                type="button"
-                onClick={emitPartyEnd}
-                className="text-xs text-gray-600 hover:text-red-400 border border-gray-800 hover:border-red-900 px-3 py-1.5 rounded-lg transition"
-              >
-                End Party
-              </button>
-            )}
           </div>
+
+          <NowPlaying song={currentSong} />
+
+          {isHost && spotifyErrorMessage && (
+            <p className="rounded-2xl border border-orange-700/30 bg-card/50 px-3 py-2 text-xs text-orange-200">
+              {spotifyErrorMessage}
+            </p>
+          )}
+
+          {isHost && (
+            <div className="flex flex-wrap items-center gap-3">
+              {nextSong && !ratingWindow && (
+                <button
+                  type="button"
+                  onClick={() => handlePlaySong(nextSong.id)}
+                  className="btn-nero-cta-fill px-6 py-2.5 text-sm font-bold uppercase tracking-wide"
+                >
+                  Play Song
+                </button>
+              )}
+
+              {currentSong && !ratingWindow && (
+                <button
+                  type="button"
+                  onClick={() => emitRatingOpen(currentSong.id)}
+                  className="rounded-full bg-fiery px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-orange-500 active:scale-95"
+                >
+                  Open Rating
+                </button>
+              )}
+
+              {deviceId ? (
+                <span className="flex items-center gap-1.5 text-xs text-success">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success" /> Spotify connected
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="h-1.5 w-1.5 rounded-full bg-border" /> Spotify not connected
+                </span>
+              )}
+            </div>
+          )}
+
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
+            <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
+              In the room ({users.length})
+            </h2>
+            <UserList
+              users={users}
+              hostId={party.host_id}
+              currentUserId={currentUser?.id ?? null}
+            />
+          </section>
         </div>
-
-        <NowPlaying song={currentSong} />
-
-        {isHost && spotifyErrorMessage && (
-          <p className="rounded-lg border border-orange-700/40 bg-orange-900/20 px-3 py-2 text-xs text-orange-200">
-            {spotifyErrorMessage}
-          </p>
-        )}
-
-        {isHost && (
-          <div className="flex flex-wrap gap-3">
-            {nextSong && !ratingWindow && (
-              <button
-                type="button"
-                onClick={() => handlePlaySong(nextSong.id)}
-                className="bg-gold text-black font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition text-sm"
-              >
-                ▶ Play Song
-              </button>
-            )}
-
-            {currentSong && !ratingWindow && (
-              <button
-                type="button"
-                onClick={() => emitRatingOpen(currentSong.id)}
-                className="bg-fiery text-white font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-orange-500 active:scale-95 transition text-sm"
-              >
-                🔥 Open Rating
-              </button>
-            )}
-
-            {deviceId ? (
-              <span className="flex items-center gap-1.5 text-xs text-success">
-                <span className="w-1.5 h-1.5 bg-success rounded-full" /> Spotify connected
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-gray-600">
-                <span className="w-1.5 h-1.5 bg-gray-600 rounded-full" /> Spotify not connected
-              </span>
-            )}
-          </div>
-        )}
-
-        <section>
-          <h2 className="font-bold text-sm uppercase tracking-wide text-gray-400 mb-3">Queue</h2>
-          <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
-        </section>
-
-        <section>
-          <h2 className="font-bold text-sm uppercase tracking-wide text-gray-400 mb-3">
-            In the room ({users.length})
-          </h2>
-          <UserList
-            users={users}
-            hostId={party.host_id}
-            currentUserId={currentUser?.id ?? null}
-          />
-        </section>
-      </div>
-    </div>
+      </NeroPageShell>
+    </>
   );
 }
 
@@ -366,7 +371,7 @@ function RatingOverlay({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: '100%', opacity: 0 }}
       transition={{ type: 'spring', damping: 22, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-black flex flex-col"
+      className="fixed inset-0 z-[100] flex flex-col bg-background"
     >
       <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 pt-10">
         <motion.div
@@ -374,7 +379,7 @@ function RatingOverlay({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1, type: 'spring', damping: 15 }}
         >
-          <h2 className="display-num text-[clamp(48px,12vw,96px)] text-gold glow-gold leading-none">
+          <h2 className="display-num text-[clamp(48px,12vw,96px)] text-accent glow-accent leading-none">
             HOT TAKE
           </h2>
         </motion.div>
@@ -405,7 +410,7 @@ function RatingOverlay({
         </p>
       </div>
 
-      <div className="p-6 pb-10 border-t border-white/10 bg-black/50 backdrop-blur-sm">
+      <div className="border-t border-border/30 bg-card/50 p-6 pb-10 backdrop-blur-sm">
         <AnimatePresence mode="wait">
           {votedFlash && lastVoteScore != null ? (
             <motion.div
@@ -415,7 +420,7 @@ function RatingOverlay({
               exit={{ scale: 1.2, opacity: 0 }}
               className="flex flex-col items-center gap-2 py-4"
             >
-              <span className="display-num text-6xl text-success glow-gold">YOU VOTED</span>
+              <span className="display-num text-6xl text-success glow-accent">YOU VOTED</span>
               <span className="text-5xl" aria-hidden>
                 {emojiForScore(lastVoteScore)}
               </span>
@@ -443,7 +448,7 @@ function RatingOverlay({
                     className={`flex flex-col items-center justify-center gap-1 rounded-2xl border-2 py-6 px-2 transition active:scale-95 ${
                       hasVoted
                         ? 'border-gray-800 bg-gray-900/50 text-gray-600 cursor-not-allowed'
-                        : 'border-white/20 bg-white/5 hover:border-gold/60 hover:bg-gold/10'
+                        : 'border-white/20 bg-white/5 hover:border-accent/50 hover:bg-accent/10'
                     }`}
                   >
                     <span className="text-4xl" aria-hidden>

@@ -94,7 +94,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
           placeholder="Search Spotify..."
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-gold/60 focus:bg-white/15 transition"
+          className="w-full rounded-lg border border-border/50 bg-card/50 px-4 py-3 text-sm text-white shadow-inner placeholder:text-muted focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30"
         />
         {loading && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs animate-pulse">
@@ -113,7 +113,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
             return (
               <li
                 key={track.id}
-                className="flex flex-col gap-2 bg-white/5 rounded-lg p-3"
+                className="flex flex-col gap-2 rounded-lg border border-border/30 bg-card/40 p-3"
               >
                 <div className="flex items-center gap-3">
                   <img
@@ -135,14 +135,14 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                       setError('');
                     }}
                     disabled={alreadyAdded || addingId === track.id}
-                    className={`shrink-0 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wide transition ${
+                    className={`shrink-0 rounded px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
                       alreadyAdded
-                        ? 'bg-gray-700 text-gray-500 cursor-default'
+                        ? 'cursor-default bg-gray-700 text-gray-500'
                         : addingId === track.id
-                          ? 'bg-gold/50 text-black cursor-wait'
+                          ? 'cursor-wait bg-accent/40 text-white'
                           : isPending
-                            ? 'bg-white/20 text-white border border-gold/50'
-                            : 'bg-gold text-black hover:bg-yellow-400 active:scale-95'
+                            ? 'border border-accent/40 bg-white/10 text-white'
+                            : 'bg-accent text-white hover:bg-green-400 active:scale-95'
                     }`}
                   >
                     {alreadyAdded
@@ -159,7 +159,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                   <div className="pl-0 pt-1 border-t border-white/10 mt-1 flex flex-col gap-3">
                     <p className="text-xs text-gray-400">
                       Pick where your <strong className="text-white">30s</strong> clip starts:{' '}
-                      <strong className="text-gold">{formatStartLabel(clipStartMs)}</strong>
+                      <strong className="text-accent">{formatStartLabel(clipStartMs)}</strong>
                       {maxClipStartMs === 0 && (
                         <span className="text-gray-500"> (full track under 30s — plays from start)</span>
                       )}
@@ -172,14 +172,14 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                         step={1000}
                         value={Math.min(clipStartMs, maxClipStartMs)}
                         onChange={(e) => setClipStartMs(Number(e.target.value))}
-                        className="w-full accent-gold"
+                        className="w-full accent-green-500"
                       />
                     )}
                     <div className="flex gap-2 justify-end">
                       <button
                         type="button"
                         onClick={() => setPendingTrack(null)}
-                        className="px-3 py-1.5 rounded text-xs font-bold text-gray-400 hover:text-white border border-white/20"
+                        className="rounded px-3 py-1.5 text-xs font-bold text-gray-400 border border-border/50 hover:text-white"
                       >
                         Cancel
                       </button>
@@ -187,7 +187,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                         type="button"
                         onClick={handleConfirmAdd}
                         disabled={addingId === track.id}
-                        className="px-4 py-1.5 rounded text-xs font-bold uppercase bg-gold text-black hover:bg-yellow-400 disabled:opacity-50"
+                        className="rounded px-4 py-1.5 text-xs font-bold uppercase bg-accent text-white hover:bg-green-400 disabled:opacity-50"
                       >
                         Add to queue
                       </button>

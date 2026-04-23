@@ -1,7 +1,9 @@
+// Party results — staged reveal, confetti, nero.fan–aligned styling
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { getResults } from '../lib/api';
 import { PartyCodeEditor } from '../components/PartyCodeEditor';
@@ -59,7 +61,7 @@ export default function Podium() {
         particleCount: 120,
         spread: 80,
         origin: { x: originX, y: 0.6 },
-        colors: ['#FFD700', '#FF4500', '#00FF88', '#fff'],
+        colors: ['#22c55e', '#00ff94', '#FF4500', '#fff'],
       });
     };
     burst(0.3);
@@ -71,23 +73,26 @@ export default function Podium() {
 
   if (results.length === 0) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-gray-500 animate-pulse">Loading results…</p>
-      </div>
+      <NeroPageShell>
+        <div className="flex min-h-[50vh] items-center justify-center p-6">
+          <p className="text-muted animate-pulse">Loading results…</p>
+        </div>
+      </NeroPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center py-12 px-6">
+    <NeroPageShell>
+      <div className="flex flex-col items-center px-6 py-10">
       <motion.div
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-10"
+        className="mb-10 text-center"
       >
-        <p className="text-gold text-xs font-bold uppercase tracking-widest mb-2">
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-accent">
           {party?.name ?? 'Nero Party'} · Final Results
         </p>
-        <h1 className="display-num text-[clamp(48px,12vw,96px)] leading-none">
+        <h1 className="display-num text-[clamp(48px,12vw,96px)] leading-none text-white">
           THE VERDICT
         </h1>
         {partyId && <PartyCodeEditor partyCode={partyId} className="mt-4 justify-center" />}
@@ -95,12 +100,13 @@ export default function Podium() {
 
       {!revealing ? (
         <motion.button
+          type="button"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           onClick={startReveal}
-          className="bg-gold text-black font-black text-2xl px-12 py-5 rounded-2xl uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition animate-bounce"
+          className="btn-nero-cta animate-bounce px-12 py-5 text-2xl font-black uppercase tracking-widest"
         >
-          🏆 Reveal Results
+          Reveal Results
         </motion.button>
       ) : (
         <div className="w-full max-w-lg flex flex-col gap-4">
@@ -121,16 +127,16 @@ export default function Podium() {
                     damping: 16,
                     stiffness: 180,
                   }}
-                  className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                  className={`flex items-center gap-4 rounded-2xl border p-4 transition-all ${
                     isWinner
-                      ? 'bg-gold/10 border-gold/50 shadow-[0_0_40px_rgba(255,215,0,0.2)]'
-                      : 'bg-white/5 border-white/10'
+                      ? 'border-accent/50 bg-accent/10 shadow-accent-glow-lg'
+                      : 'border-border/40 bg-card/60'
                   }`}
                 >
                   {/* rank badge */}
                   <span
-                    className={`display-num text-5xl w-14 text-center shrink-0 ${
-                      isWinner ? 'text-gold glow-gold' : 'text-gray-400'
+                    className={`display-num w-14 shrink-0 text-center text-5xl ${
+                      isWinner ? 'glow-accent text-accent' : 'text-gray-400'
                     }`}
                   >
                     {rankLabel}
@@ -140,16 +146,16 @@ export default function Podium() {
                   <img
                     src={song.cover_url}
                     alt=""
-                    className={`w-16 h-16 rounded-xl object-cover shrink-0 ${
-                      isWinner ? 'shadow-[0_0_20px_rgba(255,215,0,0.4)]' : ''
+                    className={`h-16 w-16 shrink-0 rounded-xl object-cover ${
+                      isWinner ? 'shadow-[0_0_20px_rgba(34,197,94,0.4)]' : ''
                     }`}
                   />
 
                   {/* info */}
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`font-black text-lg leading-tight truncate ${
-                        isWinner ? 'text-gold' : 'text-white'
+                      className={`truncate text-lg font-black leading-tight ${
+                        isWinner ? 'text-accent' : 'text-white'
                       }`}
                     >
                       {song.title}
@@ -164,7 +170,7 @@ export default function Podium() {
                   <div className="shrink-0 text-right">
                     <span
                       className={`display-num text-4xl tabular-nums ${
-                        isWinner ? 'text-gold glow-gold' : 'text-white'
+                        isWinner ? 'glow-accent text-accent' : 'text-white'
                       }`}
                     >
                       {song.avgScore.toFixed(1)}
@@ -198,10 +204,11 @@ export default function Podium() {
               transition={{ delay: 0.5 }}
               className="text-center pt-4"
             >
-              <p className="text-gold display-num text-4xl">That's a wrap! 🎉</p>
+              <p className="display-num text-4xl text-accent">That&apos;s a wrap!</p>
               <button
+                type="button"
                 onClick={() => navigate('/')}
-                className="mt-6 bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-semibold px-8 py-3 rounded-xl transition"
+                className="mt-6 rounded-full border border-border/50 bg-card/60 px-8 py-3 text-sm font-semibold text-white transition hover:bg-card"
               >
                 Host Another Party
               </button>
@@ -209,6 +216,7 @@ export default function Podium() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </NeroPageShell>
   );
 }

@@ -24,11 +24,11 @@ export default function NowPlaying({ song }: NowPlayingProps) {
               className="w-24 h-24 rounded-lg object-cover shadow-2xl"
             />
             {/* pulsing ring to indicate something is playing */}
-            <span className="absolute -inset-1 rounded-lg border-2 border-gold/40 animate-ping" />
+            <span className="absolute -inset-1 rounded-lg border-2 border-accent/40 animate-ping" />
           </div>
 
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gold mb-1">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-accent">
               Now Playing
             </p>
             <h2 className="text-2xl font-black truncate leading-tight">{song.title}</h2>

@@ -3,9 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --color-gold: #ffd700;
+  --color-accent: #22c55e;
+  --color-accent-glow: #00ff94;
   --color-fiery: #ff4500;
-  --color-success: #00ff88;
+  --color-success: #22c55e;
 }
 
 * {
@@ -13,11 +14,22 @@
 }
 
 body {
-  @apply bg-black text-white font-body;
+  @apply bg-background text-foreground font-body;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* custom range slider — game show aesthetic */
+@layer components {
+  .btn-nero-cta {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center rounded-full border border-[#00ff94]/30 bg-card/60 px-8 text-sm font-semibold text-white shadow-accent-glow transition hover:border-[#00ff94]/50 hover:shadow-[0_0_25px_rgba(34,197,94,0.45)] focus:outline-none focus:ring-2 focus:ring-accent/40 active:scale-[0.99] disabled:cursor-wait disabled:opacity-50;
+  }
+
+  .btn-nero-cta-fill {
+    @apply inline-flex min-h-[2.75rem] items-center justify-center rounded-full bg-accent px-8 text-sm font-semibold text-white shadow-md transition hover:bg-green-400 focus:outline-none focus:ring-2 focus:ring-accent/40 active:scale-[0.99] disabled:cursor-wait disabled:opacity-50;
+  }
+}
+
+/* custom range slider */
 .rating-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -25,10 +37,10 @@ body {
   height: 8px;
   background: linear-gradient(
     to right,
-    #374151 0%,
-    #ffd700 var(--value, 50%),
-    #374151 var(--value, 50%),
-    #374151 100%
+    #333333 0%,
+    var(--color-accent) var(--value, 50%),
+    #333333 var(--value, 50%),
+    #333333 100%
   );
   border-radius: 4px;
   outline: none;
@@ -41,9 +53,9 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--color-gold);
+  background: var(--color-accent);
   border: 3px solid #000;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
   cursor: grab;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
@@ -51,31 +63,39 @@ body {
 .rating-slider::-webkit-slider-thumb:active {
   cursor: grabbing;
   transform: scale(1.2);
-  box-shadow: 0 0 24px rgba(255, 215, 0, 1);
+  box-shadow: 0 0 24px rgba(34, 197, 94, 1);
 }
 
 .rating-slider::-moz-range-thumb {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--color-gold);
+  background: var(--color-accent);
   border: 3px solid #000;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
   cursor: grab;
 }
 
-/* number display with display font */
 .display-num {
-  font-family: 'Bebas Neue', Impact, sans-serif;
-  letter-spacing: 0.05em;
+  font-family: Aileron, system-ui, sans-serif;
+  font-weight: 300;
+  letter-spacing: -0.01em;
 }
 
-/* glowing text effect for scores */
+/* glowing text (scores, hero) */
+.glow-accent {
+  text-shadow:
+    0 0 10px rgba(34, 197, 94, 0.8),
+    0 0 30px rgba(34, 197, 94, 0.5),
+    0 0 60px rgba(34, 197, 94, 0.3);
+}
+
+/* legacy class name */
 .glow-gold {
   text-shadow:
-    0 0 10px rgba(255, 215, 0, 0.8),
-    0 0 30px rgba(255, 215, 0, 0.5),
-    0 0 60px rgba(255, 215, 0, 0.3);
+    0 0 10px rgba(34, 197, 94, 0.8),
+    0 0 30px rgba(34, 197, 94, 0.5),
+    0 0 60px rgba(34, 197, 94, 0.3);
 }
 
 .glow-red {

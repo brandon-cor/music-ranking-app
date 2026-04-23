@@ -4,16 +4,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        gold: '#FFD700',
-        banger: '#FFD700',
+        background: '#181818',
+        foreground: '#ffffff',
+        card: '#222222',
+        border: '#333333',
+        muted: '#C8C8C8',
+        accent: '#22c55e',
+        'accent-glow': '#00ff94',
+        success: '#22c55e',
         mid: '#6B7280',
         urgent: '#FF0000',
-        success: '#00FF88',
         fiery: '#FF4500',
       },
       fontFamily: {
-        display: ['Bebas Neue', 'Impact', 'sans-serif'],
-        body: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Aileron', 'system-ui', 'sans-serif'],
+        body: ['Aileron', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        'accent-glow': '0 0 15px rgba(34, 197, 94, 0.35), 0 0 30px rgba(34, 197, 94, 0.15)',
+        'accent-glow-lg': '0 0 40px rgba(34, 197, 94, 0.25)',
       },
       animation: {
         'pulse-fast': 'pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',

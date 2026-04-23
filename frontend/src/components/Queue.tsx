@@ -23,15 +23,15 @@ export default function Queue({ songs, currentSongId }: QueueProps) {
             key={song.id}
             className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
               isCurrent
-                ? 'bg-gold/10 border border-gold/30'
+                ? 'border border-accent/30 bg-accent/10'
                 : isPlayed
                   ? 'opacity-40'
-                  : 'bg-white/5'
+                  : 'bg-card/30'
             }`}
           >
             <span
               className={`text-sm font-bold w-5 text-center shrink-0 ${
-                isCurrent ? 'text-gold' : 'text-gray-600'
+                isCurrent ? 'text-accent' : 'text-gray-600'
               }`}
             >
               {i + 1}
@@ -53,7 +53,7 @@ export default function Queue({ songs, currentSongId }: QueueProps) {
             </div>
 
             {isCurrent && (
-              <span className="text-xs text-gold font-bold uppercase tracking-wide shrink-0">
+              <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-accent">
                 ▶ playing
               </span>
             )}
