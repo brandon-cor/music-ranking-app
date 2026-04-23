@@ -155,16 +155,30 @@ export default function Lobby() {
               <div className="min-h-[120px] flex-1">
                 <UserList users={users} hostId={party.host_id} currentUserId={currentUser?.id ?? null} />
               </div>
-              {!hostConnected && (
+              {(isHost || !hostConnected) && (
                 <div className="mt-auto border-t border-border/30 pt-4">
-                  {isHost ? (
+                  {isHost && hostConnected && (
+                    <div
+                      className="flex items-center justify-center gap-2.5 sm:justify-start"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="relative flex h-3 w-3 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+                        <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)]" />
+                      </span>
+                      <span className="text-sm font-semibold text-success">Spotify connected</span>
+                    </div>
+                  )}
+                  {isHost && !hostConnected && (
                     <a
                       href={spotifyAuthUrl}
                       className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-full bg-[#1DB954] px-5 py-3 text-sm font-bold text-black shadow-[0_0_20px_rgba(29,185,84,0.35)] transition hover:bg-[#1ed760] sm:w-auto"
                     >
                       <SpotifyIcon /> Connect Spotify
                     </a>
-                  ) : (
+                  )}
+                  {!isHost && !hostConnected && (
                     <p className="animate-pulse text-sm text-muted">Waiting for host to connect Spotify…</p>
                   )}
                 </div>
