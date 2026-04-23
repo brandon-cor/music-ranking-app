@@ -170,24 +170,26 @@ export default function Home() {
                 />
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted">
                     Songs per User
                   </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min={1}
-                      max={10}
-                      step={1}
-                      value={songsPerUser}
-                      onChange={(e) => setSongsPerUser(Number(e.target.value))}
-                      className="h-1.5 flex-1 appearance-none rounded-full accent-green-500"
-                    />
-                    <span className="w-12 text-right text-sm font-semibold text-accent">
-                      {songsPerUser}
-                    </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setSongsPerUser(n)}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                          songsPerUser === n
+                            ? 'bg-accent text-white shadow-sm'
+                            : 'border border-border/60 bg-background/80 text-muted hover:border-accent/40 hover:text-white'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
                   </div>
-                  <p className="mt-1 text-[11px] text-muted">
+                  <p className="mt-2 text-[11px] text-muted">
                     How many tracks each guest (and you) can queue up.
                   </p>
                 </div>
