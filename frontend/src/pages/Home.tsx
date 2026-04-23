@@ -38,9 +38,7 @@ export default function Home() {
 
   const [partyName, setPartyName] = useState('');
   const [hostName, setHostName] = useState('');
-  const [ratingWindow, setRatingWindow] = useState(30);
-  const [maxSongs, setMaxSongs] = useState(20);
-  const [showScores, setShowScores] = useState(false);
+  const [songsPerUser, setSongsPerUser] = useState(3);
 
   const [partyCode, setPartyCode] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -54,9 +52,7 @@ export default function Home() {
       const { party, user } = await createParty({
         name: partyName.trim(),
         hostName: hostName.trim(),
-        rating_window_seconds: ratingWindow,
-        max_songs: maxSongs,
-        show_scores: showScores,
+        songs_per_user: songsPerUser,
       });
       setParty(party);
       setCurrentUser(user);
@@ -170,54 +166,28 @@ export default function Home() {
                   placeholder="e.g. DJ Nero"
                 />
 
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-                      Rating Window
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min={15}
-                        max={60}
-                        step={5}
-                        value={ratingWindow}
-                        onChange={(e) => setRatingWindow(Number(e.target.value))}
-                        className="h-1.5 flex-1 appearance-none rounded-full accent-green-500"
-                      />
-                      <span className="w-12 text-right text-sm font-semibold text-accent">
-                        {ratingWindow}s
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="w-28">
-                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
-                      Max Songs
-                    </label>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                    Songs per User
+                  </label>
+                  <div className="flex items-center gap-2">
                     <input
-                      type="number"
+                      type="range"
                       min={1}
-                      max={50}
-                      value={maxSongs}
-                      onChange={(e) => setMaxSongs(Number(e.target.value))}
-                      className="w-full rounded-xl border border-border/60 bg-background/80 px-3 py-2 text-center text-sm text-white focus:border-accent/60 focus:outline-none"
+                      max={10}
+                      step={1}
+                      value={songsPerUser}
+                      onChange={(e) => setSongsPerUser(Number(e.target.value))}
+                      className="h-1.5 flex-1 appearance-none rounded-full accent-green-500"
                     />
+                    <span className="w-12 text-right text-sm font-semibold text-accent">
+                      {songsPerUser}
+                    </span>
                   </div>
+                  <p className="mt-1 text-[11px] text-muted">
+                    How many tracks each guest (and you) can queue up.
+                  </p>
                 </div>
-
-                <label className="flex cursor-pointer select-none items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={showScores}
-                    onChange={(e) => setShowScores(e.target.checked)}
-                    className="h-4 w-4 rounded accent-green-500"
-                  />
-                  <span className="text-sm text-foreground/80">
-                    Show scores mid-party
-                    <span className="ml-1 text-xs text-muted">(off = full reveal at the end)</span>
-                  </span>
-                </label>
 
                 {error && <p className="text-sm text-red-400">{error}</p>}
 

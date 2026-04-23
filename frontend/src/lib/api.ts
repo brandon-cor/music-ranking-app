@@ -33,9 +33,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export async function createParty(payload: {
   name: string;
   hostName: string;
-  rating_window_seconds?: number;
-  max_songs?: number;
-  show_scores?: boolean;
+  songs_per_user?: number;
 }): Promise<{ party: Party; user: User }> {
   return request('/parties', { method: 'POST', body: JSON.stringify(payload) });
 }
@@ -51,7 +49,7 @@ export async function joinParty(partyId: string, name: string): Promise<{ user: 
 export async function addSong(
   partyId: string,
   track: SpotifyTrack,
-  addedBy: string,
+  addedByUser: { id: string; name: string },
   startTimeMs = 0,
 ): Promise<{ song: Song }> {
   return request(`/parties/${partyId}/songs`, {
@@ -61,7 +59,8 @@ export async function addSong(
       title: track.name,
       artist: track.artists.map((a) => a.name).join(', '),
       cover_url: track.album.images[0]?.url ?? '',
-      added_by: addedBy,
+      added_by: addedByUser.name,
+      added_by_user_id: addedByUser.id,
       start_time_ms: startTimeMs,
     }),
   });
@@ -73,8 +72,8 @@ export async function getResults(partyId: string): Promise<{ results: SongResult
 
 // spotify endpoints
 
-export async function getSpotifyToken(partyId: string): Promise<{ token: string }> {
-  return request(`/spotify/token/${partyId}`);
+export async function getSpotifyToken(userId: string): Promise<{ token: string }> {
+  return request(`/spotify/token/${userId}`);
 }
 
 export async function searchSpotify(
@@ -85,13 +84,13 @@ export async function searchSpotify(
 }
 
 export async function spotifyPlay(
-  partyId: string,
+  userId: string,
   spotifyUri: string,
   deviceId: string,
   positionMs = 0,
 ) {
   return request('/spotify/play', {
     method: 'POST',
-    body: JSON.stringify({ partyId, spotifyUri, deviceId, positionMs }),
+    body: JSON.stringify({ userId, spotifyUri, deviceId, positionMs }),
   });
 }

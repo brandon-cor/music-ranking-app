@@ -130,10 +130,18 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       setUsers(data.users ?? []);
       setSongs(data.songs ?? []);
 
+      setCurrentUserState((prev) => {
+        if (!prev) return prev;
+        const fresh = data.users?.find((u) => u.id === prev.id);
+        return fresh ? { ...prev, ...fresh } : prev;
+      });
+
       // restore current song if party is already playing
       if (data.current_song_id && data.songs) {
         const song = data.songs.find((s) => s.id === data.current_song_id) ?? null;
         setCurrentSong(song);
+      } else {
+        setCurrentSong(null);
       }
     });
 
@@ -146,6 +154,16 @@ export function PartyProvider({ children }: { children: ReactNode }) {
 
     socket.on('user:left', ({ userId }: { userId: string }) => {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
+    });
+
+    socket.on('user:updated', ({ user }: { user: User }) => {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...user } : u)));
+      setCurrentUserState((prev) => {
+        if (!prev || prev.id !== user.id) return prev;
+        const next = { ...prev, ...user };
+        sessionStorage.setItem('nero_user', JSON.stringify(next));
+        return next;
+      });
     });
 
     socket.on('song:play', ({ song }: { song: Song }) => {
@@ -198,6 +216,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       socket.off('party:state');
       socket.off('user:joined');
       socket.off('user:left');
+      socket.off('user:updated');
       socket.off('song:play');
       socket.off('rating:open');
       socket.off('rating:confirmed');

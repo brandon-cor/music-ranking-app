@@ -1,9 +1,10 @@
 // Pre-game lobby: Spotify connect, queue build, start party
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useParty } from '../context/PartyContext';
 import { ApiError, getParty } from '../lib/api';
+import type { User } from '../types';
 import SongSearch from '../components/SongSearch';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
@@ -27,8 +28,6 @@ export default function Lobby() {
     leaveParty,
   } = useParty();
 
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-
   useEffect(() => {
     if (!partyId) return;
 
@@ -41,11 +40,15 @@ export default function Lobby() {
         if (!user) {
           const stored = sessionStorage.getItem('nero_user');
           if (stored) {
-            user = JSON.parse(stored);
+            user = JSON.parse(stored) as User;
             if (user) setCurrentUser(user);
           }
         }
-        if (user) joinRoom(partyId, user.id);
+        if (user) {
+          const fresh = fetched.users?.find((u) => u.id === user.id);
+          if (fresh) setCurrentUser({ ...user, ...fresh });
+          joinRoom(partyId, user.id);
+        }
       } catch (err) {
         if (err instanceof ApiError && err.code === 'PARTY_ENDED') {
           leaveParty('ended');
@@ -59,22 +62,31 @@ export default function Lobby() {
 
     if (!party) restoreAndJoin();
     else if (currentUser) joinRoom(partyId, currentUser.id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partyId]);
 
+  // After Spotify OAuth redirect, notify the room so `spotify_connected` updates for everyone.
   useEffect(() => {
+    if (!partyId || !currentUser) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('spotify') === 'connected') {
-      setSpotifyConnected(true);
+    if (params.get('spotify') !== 'connected') return;
+
+    joinRoom(partyId, currentUser.id);
+    const socket = getSocket();
+    const t = window.setTimeout(() => {
+      socket.emit('user:spotify_connected');
       window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [partyId, currentUser?.id, joinRoom]);
 
   useEffect(() => {
     const socket = getSocket();
     const handler = () => navigate(`/party/${partyId}/play`);
     socket.on('party:start', handler);
-    return () => { socket.off('party:start', handler); };
+    return () => {
+      socket.off('party:start', handler);
+    };
   }, [partyId, navigate]);
 
   const handleStartParty = () => {
@@ -84,7 +96,13 @@ export default function Lobby() {
     navigate(`/party/${party.id}/play`);
   };
 
-  const spotifyAuthUrl = partyId ? `/api/spotify/auth?partyId=${partyId}` : '#';
+  const allSpotifyReady =
+    users.length > 0 && users.every((u) => u.spotify_connected);
+
+  const spotifyAuthUrl =
+    partyId && currentUser
+      ? `/api/spotify/auth?userId=${encodeURIComponent(currentUser.id)}&partyId=${encodeURIComponent(partyId)}`
+      : '#';
 
   if (!party) {
     return (
@@ -116,29 +134,40 @@ export default function Lobby() {
           {partyId && <PartyCodeEditor partyCode={partyId} className="mt-2" />}
         </motion.div>
 
-        {isHost && (
-          <motion.section
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
-          >
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Spotify Playback</h2>
-            {spotifyConnected ? (
-              <p className="text-sm font-semibold text-success">Connected — you can play from the party screen</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm text-muted">Connect your Spotify Premium account to control playback.</p>
-                <a
-                  href={spotifyAuthUrl}
-                  className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#1ed760]"
-                >
-                  <SpotifyIcon /> Connect Spotify
-                </a>
-              </div>
-            )}
-          </motion.section>
-        )}
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
+        >
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">Spotify (Premium)</h2>
+          {currentUser?.spotify_connected ? (
+            <p className="text-sm font-semibold text-success">
+              You&apos;re connected — you can search, preview clips, and join playback when the party goes live.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-muted">
+                Connect your own Spotify Premium account. Everyone in the room must connect before the host can start.
+              </p>
+              <a
+                href={spotifyAuthUrl}
+                className="inline-flex w-fit items-center gap-2 rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#1ed760]"
+              >
+                <SpotifyIcon /> Connect Spotify
+              </a>
+            </div>
+          )}
+          {!allSpotifyReady && users.length > 0 && (
+            <p className="mt-3 text-xs text-muted">
+              Waiting for Spotify:{' '}
+              {users
+                .filter((u) => !u.spotify_connected)
+                .map((u) => u.name)
+                .join(', ') || '—'}
+            </p>
+          )}
+        </motion.section>
 
         <section>
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
@@ -154,16 +183,16 @@ export default function Lobby() {
           className="rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm"
         >
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">
-            Add Songs{' '}
+            Add songs{' '}
             <span className="font-normal text-muted">
-              ({songs.length} / {party.max_songs})
+              (up to {party.songs_per_user} picks per person)
             </span>
           </h2>
 
-          {spotifyConnected || isHost ? (
+          {currentUser?.spotify_connected ? (
             <SongSearch partyId={party.id} />
           ) : (
-            <p className="text-sm italic text-muted">Only the host can search while Spotify is connected.</p>
+            <p className="text-sm italic text-muted">Connect Spotify to search and add tracks.</p>
           )}
         </motion.section>
 
@@ -174,11 +203,9 @@ export default function Lobby() {
           </section>
         )}
 
-        <div className="flex flex-wrap gap-4 text-xs text-muted">
-          <span>⏱ {party.rating_window_seconds}s rating window</span>
-          <span>🎵 Max {party.max_songs} songs</span>
-          {party.show_scores && <span>📊 Scores visible mid-party</span>}
-        </div>
+        <p className="text-xs text-muted">
+          When the party starts, everyone gets a <strong className="text-white">30s</strong> window to rate each clip.
+        </p>
 
         {isHost && (
           <motion.div
@@ -189,10 +216,14 @@ export default function Lobby() {
             <button
               type="button"
               onClick={handleStartParty}
-              disabled={songs.length === 0}
+              disabled={songs.length === 0 || !allSpotifyReady}
               className="btn-nero-cta w-full py-3 text-base disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {songs.length === 0 ? 'Add songs to start' : 'Start the Party'}
+              {songs.length === 0
+                ? 'Add songs to start'
+                : !allSpotifyReady
+                  ? 'Waiting for everyone to connect Spotify'
+                  : 'Start the Party'}
             </button>
           </motion.div>
         )}

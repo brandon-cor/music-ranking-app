@@ -1,10 +1,13 @@
+// Spotify OAuth + Web API helpers. Tokens are stored per-user (each user, host
+// or guest, signs in with their own Spotify Premium account so they can stream
+// clip previews on their own browser device).
 import { prisma } from './prisma';
 
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 
-// build the Spotify OAuth authorization URL
-export function getAuthUrl(partyId: string): string {
+/** Build the Spotify OAuth authorize URL; state carries both userId and partyId. */
+export function getAuthUrl(userId: string, partyId: string): string {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: process.env.SPOTIFY_CLIENT_ID!,
@@ -16,14 +19,26 @@ export function getAuthUrl(partyId: string): string {
       'user-modify-playback-state',
     ].join(' '),
     redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
-    state: partyId,
+    state: `${userId}:${partyId}`,
   });
   return `https://accounts.spotify.com/authorize?${params.toString()}`;
 }
 
-// exchange auth code for access + refresh tokens
-export async function exchangeCode(code: string): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
-  const creds = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+/** Parse the state value we packed in getAuthUrl back into its parts. */
+export function parseAuthState(state: string): { userId: string; partyId: string } | null {
+  const [userId, partyId] = state.split(':');
+  if (!userId || !partyId) return null;
+  return { userId, partyId };
+}
+
+export async function exchangeCode(code: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}> {
+  const creds = Buffer.from(
+    `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`,
+  ).toString('base64');
   const res = await fetch(SPOTIFY_TOKEN_URL, {
     method: 'POST',
     headers: {
@@ -40,12 +55,14 @@ export async function exchangeCode(code: string): Promise<{ access_token: string
   return res.json() as Promise<{ access_token: string; refresh_token: string; expires_in: number }>;
 }
 
-// get a fresh access token using the stored refresh token
-export async function refreshToken(partyId: string): Promise<string> {
-  const party = await prisma.party.findUnique({ where: { id: partyId } });
-  if (!party?.spotify_refresh_token) throw new Error('No refresh token stored');
+/** Refresh the access token for a given user, using their stored refresh token. */
+export async function refreshToken(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user?.spotify_refresh_token) throw new Error('No refresh token stored for this user');
 
-  const creds = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+  const creds = Buffer.from(
+    `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`,
+  ).toString('base64');
   const res = await fetch(SPOTIFY_TOKEN_URL, {
     method: 'POST',
     headers: {
@@ -54,27 +71,26 @@ export async function refreshToken(partyId: string): Promise<string> {
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: party.spotify_refresh_token,
+      refresh_token: user.spotify_refresh_token,
     }),
   });
   if (!res.ok) throw new Error('Failed to refresh Spotify token');
   const data = (await res.json()) as { access_token: string };
 
-  await prisma.party.update({
-    where: { id: partyId },
+  await prisma.user.update({
+    where: { id: userId },
     data: { spotify_access_token: data.access_token },
   });
   return data.access_token;
 }
 
-// get a valid access token, refreshing if needed
-export async function getToken(partyId: string): Promise<string> {
-  const party = await prisma.party.findUnique({ where: { id: partyId } });
-  if (!party?.spotify_access_token) throw new Error('No Spotify token for this party');
-  return party.spotify_access_token;
+/** Returns the current user's access token (throws if they haven't connected). */
+export async function getToken(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user?.spotify_access_token) throw new Error('No Spotify token for this user');
+  return user.spotify_access_token;
 }
 
-// search Spotify tracks
 export async function searchTracks(query: string, token: string) {
   const url = `${SPOTIFY_API_BASE}/search?q=${encodeURIComponent(query)}&type=track&limit=10`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -84,8 +100,12 @@ export async function searchTracks(query: string, token: string) {
   return data.tracks.items;
 }
 
-// tell Spotify to play a track on a specific device, optionally from a given position
-export async function playTrack(token: string, spotifyUri: string, deviceId: string, positionMs = 0) {
+export async function playTrack(
+  token: string,
+  spotifyUri: string,
+  deviceId: string,
+  positionMs = 0,
+) {
   const res = await fetch(`${SPOTIFY_API_BASE}/me/player/play?device_id=${deviceId}`, {
     method: 'PUT',
     headers: {
@@ -94,7 +114,6 @@ export async function playTrack(token: string, spotifyUri: string, deviceId: str
     },
     body: JSON.stringify({ uris: [spotifyUri], position_ms: positionMs }),
   });
-  // 204 = success with no body; 200 is also fine
   if (res.ok || res.status === 204) return;
   const body = await res.text().catch(() => '');
   throw new Error(`Spotify API ${res.status}: ${body}`);

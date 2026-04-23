@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
-import { ApiError, getParty, getSpotifyToken, spotifyPlay } from '../lib/api';
+import { ApiError, getParty, spotifyPlay } from '../lib/api';
+import { useUserSpotifyPlayer } from '../lib/spotify-sdk';
 import { playRatingOpen, playVoteConfirm } from '../lib/audio';
 import { IPodPlayer } from '../components/IPodPlayer';
 import { RatingPanel } from '../components/RatingPanel';
+import StartCountdown from '../components/StartCountdown';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
 import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import type { RatingWindowState, SpotifyPlayer } from '../types';
+import type { RatingWindowState, User } from '../types';
 
 export default function Player() {
   const { partyId } = useParams<{ partyId: string }>();
@@ -36,10 +38,15 @@ export default function Player() {
     leaveParty,
   } = useParty();
 
-  const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [spotifyErrorMessage, setSpotifyErrorMessage] = useState<string | null>(null);
-  const [playerInstance, setPlayerInstance] = useState<SpotifyPlayer | null>(null);
-  const playerRef = useRef<SpotifyPlayer | null>(null);
+  const { deviceId, playerRef, player: playerInstance, errorMessage: sdkSpotifyError, clearError } =
+    useUserSpotifyPlayer(currentUser?.id, isHost && !!currentUser?.spotify_connected);
+
+  const [localPlayError, setLocalPlayError] = useState<string | null>(null);
+  const [showStartCountdown, setShowStartCountdown] = useState(false);
+  const [introDone, setIntroDone] = useState(false);
+  const autoPlayLaunchedRef = useRef(false);
+
+  const spotifyErrorMessage = localPlayError || sdkSpotifyError;
 
   const [votedFlash, setVotedFlash] = useState(false);
   const [lastVoteScore, setLastVoteScore] = useState<number | null>(null);
@@ -53,15 +60,19 @@ export default function Player() {
       try {
         const fetched = await getParty(partyId);
         setParty(fetched);
-        let user = currentUser;
+        let user: User | null = currentUser;
         if (!user) {
           const stored = sessionStorage.getItem('nero_user');
           if (stored) {
-            user = JSON.parse(stored);
+            user = JSON.parse(stored) as User;
             if (user) setCurrentUser(user);
           }
         }
-        if (user) joinRoom(partyId, user.id);
+        if (user) {
+          const fresh = fetched.users?.find((u) => u.id === user.id);
+          if (fresh) setCurrentUser({ ...user, ...fresh });
+          joinRoom(partyId, user.id);
+        }
       } catch (err) {
         if (err instanceof ApiError && err.code === 'PARTY_ENDED') {
           leaveParty('ended');
@@ -90,71 +101,57 @@ export default function Player() {
     return undefined;
   }, [ratingWindow, hasVoted, party?.status]);
 
-  // initialize Spotify Web Playback SDK for the host
   useEffect(() => {
-    if (!isHost || !partyId) return;
+    if (party?.status === 'playing' && !currentSong && songs.length > 0 && !introDone) {
+      setShowStartCountdown(true);
+    }
+  }, [party?.status, currentSong, songs.length, introDone]);
 
-    const initPlayer = async () => {
+  useEffect(() => {
+    if (party?.status !== 'playing') {
+      setShowStartCountdown(false);
+    }
+  }, [party?.status]);
+
+  useEffect(() => {
+    if (currentSong) {
+      setShowStartCountdown(false);
+      setIntroDone(true);
+      autoPlayLaunchedRef.current = true;
+    }
+  }, [currentSong]);
+
+  const onStartCountdownComplete = useCallback(() => {
+    setShowStartCountdown(false);
+    setIntroDone(true);
+  }, []);
+
+  useEffect(() => {
+    if (!introDone || autoPlayLaunchedRef.current || !isHost || currentSong) return;
+    const first = songs[0];
+    if (!first || !deviceId || !currentUser?.id) return;
+    autoPlayLaunchedRef.current = true;
+    void (async () => {
+      playerRef.current?.activateElement();
       try {
-        const { token } = await getSpotifyToken(partyId);
-
-        const sdkReady = () => {
-          const onPlayerError = (message: string) => {
-            console.warn(message);
-            setSpotifyErrorMessage(
-              'Spotify playback is unavailable in this browser. Open the host screen in Chrome, reconnect Spotify, then try again.',
-            );
-          };
-
-          const player: SpotifyPlayer = new window.Spotify.Player({
-            name: 'Nero Party',
-            getOAuthToken: (cb) => cb(token),
-            volume: 0.8,
-          });
-
-          player.addListener('ready', (data) => {
-            const { device_id } = data as { device_id: string };
-            setDeviceId(device_id);
-            setSpotifyErrorMessage(null);
-          });
-
-          player.addListener('not_ready', () => setDeviceId(null));
-          player.addListener('initialization_error', () => onPlayerError('Spotify SDK initialization failed'));
-          player.addListener('authentication_error', () => onPlayerError('Spotify SDK authentication failed'));
-          player.addListener('account_error', () => onPlayerError('Spotify SDK account check failed'));
-          player.addListener('playback_error', () => onPlayerError('Spotify playback error'));
-
-          player.connect().then((success) => {
-            if (!success) onPlayerError('Spotify player failed to connect');
-          });
-
-          playerRef.current = player;
-          setPlayerInstance(player);
-        };
-
-        if (window.Spotify) {
-          sdkReady();
-        } else {
-          window.onSpotifyWebPlaybackSDKReady = sdkReady;
-        }
-      } catch {
-        console.info('No Spotify token for host — skipping SDK init');
-        setSpotifyErrorMessage('Connect Spotify from the lobby before starting songs.');
-        setPlayerInstance(null);
-        playerRef.current = null;
+        await spotifyPlay(
+          currentUser.id,
+          `spotify:track:${first.spotify_id}`,
+          deviceId,
+          first.start_time_ms ?? 0,
+        );
+        setLocalPlayError(null);
+        clearError();
+        emitSongPlay(first.id);
+      } catch (err) {
+        console.warn('Spotify auto-play failed:', err);
+        autoPlayLaunchedRef.current = false;
+        setLocalPlayError(
+          'Could not start Spotify playback. Open Spotify on the host browser, then tap Play Song.',
+        );
       }
-    };
-
-    void initPlayer();
-
-    return () => {
-      const p = playerRef.current;
-      playerRef.current = null;
-      setPlayerInstance(null);
-      p?.disconnect();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHost, partyId]);
+    })();
+  }, [introDone, deviceId, songs, isHost, currentSong, currentUser?.id, emitSongPlay, playerRef, clearError]);
 
   useEffect(() => {
     if (ratingWindow) {
@@ -166,10 +163,10 @@ export default function Player() {
 
   const handlePlaySong = async (songId: string) => {
     const song = songs.find((s) => s.id === songId);
-    if (!song) return;
+    if (!song || !currentUser?.id) return;
 
-    if (!partyId || !deviceId) {
-      setSpotifyErrorMessage(
+    if (!deviceId) {
+      setLocalPlayError(
         'Spotify player is not ready yet. Make sure the host browser supports Spotify playback and reconnect Spotify.',
       );
       return;
@@ -179,16 +176,17 @@ export default function Player() {
 
     try {
       await spotifyPlay(
-        partyId,
+        currentUser.id,
         `spotify:track:${song.spotify_id}`,
         deviceId,
         song.start_time_ms ?? 0,
       );
-      setSpotifyErrorMessage(null);
+      setLocalPlayError(null);
+      clearError();
       emitSongPlay(songId);
     } catch (err) {
       console.warn('Spotify play failed:', err);
-      setSpotifyErrorMessage(
+      setLocalPlayError(
         'Could not start Spotify playback. Open Spotify on the host browser, then try starting the song again.',
       );
     }
@@ -220,6 +218,12 @@ export default function Player() {
 
   return (
     <>
+      <AnimatePresence>
+        {showStartCountdown && (
+          <StartCountdown key="start-countdown" onComplete={onStartCountdownComplete} />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {missedVote && (
           <motion.div

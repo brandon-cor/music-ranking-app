@@ -1,17 +1,19 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
+import { toSafeParty, toSafeUser } from '../lib/serialize';
 
 const router = Router();
 
-// POST /api/parties — create a new party (host flow)
+// POST /api/parties — create a new party (host flow). Guests and the host both
+// need to sign in with their own Spotify account after creation, so the home
+// page no longer exposes rating-window or max-songs knobs; only how many songs
+// each user gets to queue.
 router.post('/', async (req, res) => {
   try {
-    const { name, hostName, rating_window_seconds, max_songs, show_scores } = req.body as {
+    const { name, hostName, songs_per_user } = req.body as {
       name: string;
       hostName: string;
-      rating_window_seconds?: number;
-      max_songs?: number;
-      show_scores?: boolean;
+      songs_per_user?: number;
     };
 
     if (!name || !hostName) {
@@ -19,19 +21,16 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    // clamp rating window between 15 and 60 seconds
-    const window = Math.min(60, Math.max(15, rating_window_seconds ?? 30));
+    const perUser = Math.min(10, Math.max(1, songs_per_user ?? 3));
 
     const party = await prisma.party.create({
       data: {
         name,
-        rating_window_seconds: window,
-        max_songs: max_songs ?? 20,
-        show_scores: show_scores ?? false,
+        rating_window_seconds: 30,
+        songs_per_user: perUser,
       },
     });
 
-    // create the host user and link back to party
     const host = await prisma.user.create({
       data: { name: hostName, party_id: party.id },
     });
@@ -42,14 +41,14 @@ router.post('/', async (req, res) => {
       include: { users: true, songs: true },
     });
 
-    res.json({ party: updatedParty, user: host });
+    res.json({ party: toSafeParty(updatedParty), user: toSafeUser(host) });
   } catch (error) {
     console.error('POST /api/parties', error);
     res.status(500).json({ error: 'Failed to create party' });
   }
 });
 
-// GET /api/parties/:id — get party state
+// GET /api/parties/:id — get party state (tokens stripped, spotify_connected flag)
 router.get('/:id', async (req, res) => {
   try {
     const party = await prisma.party.findUnique({
@@ -65,16 +64,12 @@ router.get('/:id', async (req, res) => {
       return;
     }
 
-    // ended parties are no longer joinable from the URL — only the podium
-    // (which uses the results endpoint) can read them.
     if (party.status === 'ended') {
       res.status(410).json({ error: 'This party has ended', code: 'PARTY_ENDED' });
       return;
     }
 
-    // never expose Spotify tokens over the wire
-    const { spotify_access_token: _, spotify_refresh_token: __, ...safeParty } = party;
-    res.json(safeParty);
+    res.json(toSafeParty(party));
   } catch (error) {
     console.error('GET /api/parties/:id', error);
     res.status(500).json({ error: 'Failed to fetch party' });
@@ -105,24 +100,39 @@ router.post('/:id/join', async (req, res) => {
       data: { name, party_id: party.id },
     });
 
-    res.json({ user });
+    res.json({ user: toSafeUser(user) });
   } catch (error) {
     console.error('POST /api/parties/:id/join', error);
     res.status(500).json({ error: 'Failed to join party' });
   }
 });
 
-// POST /api/parties/:id/songs — add a song to the queue (any user)
+// POST /api/parties/:id/songs — add a song. Each user can queue up to
+// `songs_per_user` tracks; we count by added_by_user_id.
 router.post('/:id/songs', async (req, res) => {
   try {
-    const { spotify_id, title, artist, cover_url, added_by, start_time_ms } = req.body as {
+    const {
+      spotify_id,
+      title,
+      artist,
+      cover_url,
+      added_by,
+      added_by_user_id,
+      start_time_ms,
+    } = req.body as {
       spotify_id: string;
       title: string;
       artist: string;
       cover_url: string;
       added_by: string;
+      added_by_user_id: string;
       start_time_ms?: number;
     };
+
+    if (!added_by_user_id) {
+      res.status(400).json({ error: 'added_by_user_id is required' });
+      return;
+    }
 
     const party = await prisma.party.findUnique({
       where: { id: req.params.id },
@@ -133,11 +143,15 @@ router.post('/:id/songs', async (req, res) => {
       res.status(404).json({ error: 'Party not found' });
       return;
     }
-    if (party.songs.length >= party.max_songs) {
-      res.status(400).json({ error: `Queue is full (max ${party.max_songs} songs)` });
+
+    const usersOwnCount = party.songs.filter((s) => s.added_by_user_id === added_by_user_id).length;
+    if (usersOwnCount >= party.songs_per_user) {
+      res.status(400).json({
+        error: `You've used all ${party.songs_per_user} of your picks`,
+      });
       return;
     }
-    // prevent duplicates in the queue
+
     const alreadyQueued = party.songs.some((s) => s.spotify_id === spotify_id);
     if (alreadyQueued) {
       res.status(400).json({ error: 'This song is already in the queue' });
@@ -152,6 +166,7 @@ router.post('/:id/songs', async (req, res) => {
         artist,
         cover_url,
         added_by,
+        added_by_user_id,
         order: party.songs.length,
         start_time_ms: start_time_ms ?? 0,
       },
@@ -188,7 +203,6 @@ router.get('/:id/results', async (req, res) => {
     const results = songs
       .map((song) => {
         const totalScore = song.ratings.reduce((sum, r) => sum + r.score, 0);
-        // non-voters contribute 0, so divide by total user count
         const avgScore = totalScore / userCount;
         const firstVote =
           song.ratings.length > 0

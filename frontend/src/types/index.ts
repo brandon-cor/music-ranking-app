@@ -4,6 +4,7 @@ export interface Party {
   status: 'lobby' | 'playing' | 'ended';
   rating_window_seconds: number;
   max_songs: number;
+  songs_per_user: number;
   show_scores: boolean;
   host_id: string | null;
   current_song_id: string | null;
@@ -16,6 +17,7 @@ export interface User {
   id: string;
   name: string;
   party_id: string;
+  spotify_connected: boolean;
 }
 
 export interface Song {
@@ -26,6 +28,7 @@ export interface Song {
   artist: string;
   cover_url: string;
   added_by: string;
+  added_by_user_id: string | null;
   order: number;
   start_time_ms: number;
 }

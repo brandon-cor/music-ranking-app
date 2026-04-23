@@ -1,7 +1,10 @@
+// Spotify REST routes. Auth/tokens are per-user; playback routes take a userId
+// so the caller can be either the host (main playback) or a guest (clip preview).
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import {
   getAuthUrl,
+  parseAuthState,
   exchangeCode,
   getToken,
   refreshToken,
@@ -11,34 +14,41 @@ import {
 
 const router = Router();
 
-// GET /api/spotify/auth?partyId=xxx — kick off Spotify OAuth for the host
+// GET /api/spotify/auth?userId=xxx&partyId=yyy — kick off OAuth for a given user
 router.get('/auth', (req, res) => {
-  const { partyId } = req.query as { partyId: string };
-  if (!partyId) {
-    res.status(400).json({ error: 'partyId is required' });
+  const { userId, partyId } = req.query as { userId?: string; partyId?: string };
+  if (!userId || !partyId) {
+    res.status(400).json({ error: 'userId and partyId are required' });
     return;
   }
-  res.redirect(getAuthUrl(partyId));
+  res.redirect(getAuthUrl(userId, partyId));
 });
 
 // GET /api/spotify/callback — Spotify redirects here after user grants access
 router.get('/callback', async (req, res) => {
-  const { code, state: partyId, error } = req.query as {
+  const { code, state, error } = req.query as {
     code?: string;
     state?: string;
     error?: string;
   };
 
-  if (error || !code || !partyId) {
+  if (error || !code || !state) {
     res.redirect(`${process.env.FRONTEND_URL}/?error=spotify_denied`);
     return;
   }
 
+  const parsed = parseAuthState(state);
+  if (!parsed) {
+    res.redirect(`${process.env.FRONTEND_URL}/?error=spotify_bad_state`);
+    return;
+  }
+  const { userId, partyId } = parsed;
+
   try {
     const tokens = await exchangeCode(code);
 
-    await prisma.party.update({
-      where: { id: partyId },
+    await prisma.user.update({
+      where: { id: userId },
       data: {
         spotify_access_token: tokens.access_token,
         spotify_refresh_token: tokens.refresh_token,
@@ -52,16 +62,15 @@ router.get('/callback', async (req, res) => {
   }
 });
 
-// GET /api/spotify/token/:partyId — return current access token to the host's frontend
-// (needed to initialize the Web Playback SDK)
-router.get('/token/:partyId', async (req, res) => {
+// GET /api/spotify/token/:userId — return the user's current access token (needed
+// to initialize the Web Playback SDK in their own browser).
+router.get('/token/:userId', async (req, res) => {
   try {
-    const token = await getToken(req.params.partyId);
+    const token = await getToken(req.params.userId);
     res.json({ token });
   } catch {
-    // token missing or expired — try a refresh
     try {
-      const token = await refreshToken(req.params.partyId);
+      const token = await refreshToken(req.params.userId);
       res.json({ token });
     } catch {
       res.status(401).json({ error: 'No Spotify token. Please connect Spotify.' });
@@ -69,7 +78,9 @@ router.get('/token/:partyId', async (req, res) => {
   }
 });
 
-// GET /api/spotify/search?q=...&partyId=... — search tracks
+// GET /api/spotify/search?q=...&partyId=... — search via the party host's token
+// so guests without their own premium still see results (they still need their
+// own premium auth to actually stream/preview).
 router.get('/search', async (req, res) => {
   const { q, partyId } = req.query as { q: string; partyId: string };
 
@@ -79,14 +90,20 @@ router.get('/search', async (req, res) => {
   }
 
   try {
-    let token = await getToken(partyId);
+    const party = await prisma.party.findUnique({ where: { id: partyId } });
+    if (!party?.host_id) {
+      res.status(400).json({ error: 'Party has no host' });
+      return;
+    }
+    const hostId = party.host_id;
+
+    let token = await getToken(hostId);
     let tracks;
     try {
       tracks = await searchTracks(q, token);
     } catch (err) {
       if ((err as Error).message === 'SPOTIFY_UNAUTHORIZED') {
-        // silently refresh and retry once
-        token = await refreshToken(partyId);
+        token = await refreshToken(hostId);
         tracks = await searchTracks(q, token);
       } else {
         throw err;
@@ -99,27 +116,29 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// POST /api/spotify/play — tell Spotify to play a track on the host's browser device
+// POST /api/spotify/play — stream a track on the caller's own device. The
+// caller's userId determines which Spotify account + token is used; host uses
+// this for party playback, guests use it for clip previews.
 router.post('/play', async (req, res) => {
-  const { partyId, spotifyUri, deviceId, positionMs } = req.body as {
-    partyId: string;
+  const { userId, spotifyUri, deviceId, positionMs } = req.body as {
+    userId: string;
     spotifyUri: string;
     deviceId: string;
     positionMs?: number;
   };
 
-  if (!partyId || !spotifyUri || !deviceId) {
-    res.status(400).json({ error: 'partyId, spotifyUri, and deviceId are required' });
+  if (!userId || !spotifyUri || !deviceId) {
+    res.status(400).json({ error: 'userId, spotifyUri, and deviceId are required' });
     return;
   }
 
   try {
-    let token = await getToken(partyId);
+    let token = await getToken(userId);
     const startMs = positionMs ?? 0;
     try {
       await playTrack(token, spotifyUri, deviceId, startMs);
     } catch {
-      token = await refreshToken(partyId);
+      token = await refreshToken(userId);
       await playTrack(token, spotifyUri, deviceId, startMs);
     }
     res.json({ ok: true });

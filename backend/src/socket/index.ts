@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { prisma } from '../lib/prisma';
+import { toSafeParty, toSafeUser } from '../lib/serialize';
 
 // one timer per party — tracks the active rating window
 const ratingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -48,12 +49,20 @@ export function setupSocket(io: Server) {
         }
       }
 
-      // tell everyone else someone joined
-      socket.to(`party:${partyId}`).emit('user:joined', { user });
+      socket.to(`party:${partyId}`).emit('user:joined', { user: toSafeUser(user) });
 
-      // send the joining client the current party snapshot
-      const { spotify_access_token: _, spotify_refresh_token: __, ...safeParty } = party;
-      socket.emit('party:state', safeParty);
+      socket.emit('party:state', toSafeParty(party));
+    });
+
+    // user:spotify_connected — the caller just finished OAuth; tell the room
+    // so everyone can see their "connected" flag update and the host can
+    // enable the Start-the-Party button once all guests are ready.
+    socket.on('user:spotify_connected', async () => {
+      const { partyId, userId } = socket.data as { partyId?: string; userId?: string };
+      if (!partyId || !userId) return;
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) return;
+      io.to(`party:${partyId}`).emit('user:updated', { user: toSafeUser(user) });
     });
 
     // party:start — host starts the party, broadcast to all guests in lobby
@@ -63,7 +72,17 @@ export function setupSocket(io: Server) {
       if (!p || p.host_id !== userId) return;
 
       await prisma.party.update({ where: { id: pid }, data: { status: 'playing' } });
-      // tell everyone in the room (host navigates themselves on the client)
+      const updated = await prisma.party.findUnique({
+        where: { id: pid },
+        include: {
+          users: true,
+          songs: { orderBy: { order: 'asc' } },
+        },
+      });
+      if (updated) {
+        // include the host so their client picks up status: playing before/after navigation
+        io.in(`party:${pid}`).emit('party:state', toSafeParty(updated));
+      }
       socket.to(`party:${pid}`).emit('party:start');
     });
 

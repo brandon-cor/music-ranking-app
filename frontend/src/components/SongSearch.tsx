@@ -1,8 +1,9 @@
 // Spotify search + add-to-queue with a 30s clip start picker (chooser sets start_time_ms).
-import { useState, useRef, useEffect } from 'react';
-import { searchSpotify, addSong } from '../lib/api';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { searchSpotify, addSong, spotifyPlay } from '../lib/api';
 import type { SpotifyTrack } from '../types';
 import { useParty } from '../context/PartyContext';
+import { useUserSpotifyPlayer } from '../lib/spotify-sdk';
 
 const CLIP_LENGTH_MS = 30_000;
 
@@ -20,18 +21,37 @@ function formatStartLabel(ms: number): string {
 
 export default function SongSearch({ partyId }: SongSearchProps) {
   const { currentUser, addSongToList, songs, party } = useParty();
+  const { deviceId, playerRef, errorMessage: sdkError, clearError } = useUserSpotifyPlayer(
+    currentUser?.id,
+    !!currentUser?.spotify_connected,
+  );
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SpotifyTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [pendingTrack, setPendingTrack] = useState<SpotifyTrack | null>(null);
   const [clipStartMs, setClipStartMs] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const picksUsed = songs.filter((s) => s.added_by_user_id === currentUser?.id).length;
+  const picksCap = party?.songs_per_user ?? 3;
+  const atPickLimit = picksUsed >= picksCap;
+
   const maxClipStartMs = pendingTrack
     ? Math.max(0, pendingTrack.duration_ms - CLIP_LENGTH_MS)
     : 0;
+
+  const pausePreview = useCallback(async () => {
+    setPreviewingId(null);
+    try {
+      await playerRef.current?.pause();
+    } catch {
+      /* ignore */
+    }
+  }, [playerRef]);
 
   useEffect(() => {
     if (pendingTrack) {
@@ -42,6 +62,7 @@ export default function SongSearch({ partyId }: SongSearchProps) {
   const handleSearch = (q: string) => {
     setQuery(q);
     setError('');
+    clearError();
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!q.trim()) {
@@ -62,18 +83,38 @@ export default function SongSearch({ partyId }: SongSearchProps) {
     }, 400);
   };
 
+  const handlePreview = async () => {
+    if (!currentUser || !pendingTrack || !deviceId) return;
+    const startMs = Math.min(Math.max(0, clipStartMs), maxClipStartMs);
+    playerRef.current?.activateElement();
+    setPreviewingId(pendingTrack.id);
+    setError('');
+    try {
+      await spotifyPlay(
+        currentUser.id,
+        `spotify:track:${pendingTrack.id}`,
+        deviceId,
+        startMs,
+      );
+    } catch (err) {
+      setPreviewingId(null);
+      setError((err as Error).message);
+    }
+  };
+
   const handleConfirmAdd = async () => {
     if (!currentUser || !pendingTrack) return;
-    if (songs.length >= (party?.max_songs ?? 20)) {
-      setError(`Queue is full (max ${party?.max_songs} songs)`);
+    if (atPickLimit) {
+      setError(`You already added ${picksCap} song${picksCap === 1 ? '' : 's'} (your limit for this party).`);
       return;
     }
 
     const startMs = Math.min(Math.max(0, clipStartMs), maxClipStartMs);
 
+    await pausePreview();
     setAddingId(pendingTrack.id);
     try {
-      const data = await addSong(partyId, pendingTrack, currentUser.name, startMs);
+      const data = await addSong(partyId, pendingTrack, { id: currentUser.id, name: currentUser.name }, startMs);
       addSongToList(data.song);
       setResults((prev) => prev.filter((t) => t.id !== pendingTrack.id));
       setPendingTrack(null);
@@ -82,6 +123,12 @@ export default function SongSearch({ partyId }: SongSearchProps) {
     } finally {
       setAddingId(null);
     }
+  };
+
+  const handleCancelPending = async () => {
+    await pausePreview();
+    setPendingTrack(null);
+    setError('');
   };
 
   const queuedIds = new Set(songs.map((s) => s.spotify_id));
@@ -103,7 +150,13 @@ export default function SongSearch({ partyId }: SongSearchProps) {
         )}
       </div>
 
-      {error && <p className="text-red-400 text-xs">{error}</p>}
+      <p className="text-xs text-muted">
+        Your picks: <strong className="text-white">{picksUsed}</strong> / {picksCap}
+      </p>
+
+      {(error || sdkError) && (
+        <p className="text-red-400 text-xs">{error || sdkError}</p>
+      )}
 
       {results.length > 0 && (
         <ul className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
@@ -130,28 +183,33 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                   <button
                     type="button"
                     onClick={() => {
-                      if (alreadyAdded) return;
+                      if (alreadyAdded || atPickLimit) return;
+                      void pausePreview();
                       setPendingTrack(isPending ? null : track);
                       setError('');
                     }}
-                    disabled={alreadyAdded || addingId === track.id}
+                    disabled={alreadyAdded || addingId === track.id || atPickLimit}
                     className={`shrink-0 rounded px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
                       alreadyAdded
                         ? 'cursor-default bg-gray-700 text-gray-500'
-                        : addingId === track.id
-                          ? 'cursor-wait bg-accent/40 text-white'
-                          : isPending
-                            ? 'border border-accent/40 bg-white/10 text-white'
-                            : 'bg-accent text-white hover:bg-green-400 active:scale-95'
+                        : atPickLimit
+                          ? 'cursor-not-allowed bg-gray-800 text-gray-600'
+                          : addingId === track.id
+                            ? 'cursor-wait bg-accent/40 text-white'
+                            : isPending
+                              ? 'border border-accent/40 bg-white/10 text-white'
+                              : 'bg-accent text-white hover:bg-green-400 active:scale-95'
                     }`}
                   >
                     {alreadyAdded
                       ? 'Added'
-                      : addingId === track.id
-                        ? '…'
-                        : isPending
-                          ? 'Cancel'
-                          : '+ Add'}
+                      : atPickLimit
+                        ? 'Limit'
+                        : addingId === track.id
+                          ? '…'
+                          : isPending
+                            ? 'Cancel'
+                            : '+ Add'}
                   </button>
                 </div>
 
@@ -175,17 +233,25 @@ export default function SongSearch({ partyId }: SongSearchProps) {
                         className="w-full accent-green-500"
                       />
                     )}
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex flex-wrap gap-2 justify-end">
                       <button
                         type="button"
-                        onClick={() => setPendingTrack(null)}
+                        onClick={() => void handlePreview()}
+                        disabled={!deviceId || previewingId === track.id}
+                        className="rounded px-3 py-1.5 text-xs font-bold text-white border border-accent/50 bg-accent/20 hover:bg-accent/30 disabled:opacity-40"
+                      >
+                        {!deviceId ? 'Preview (connecting…)' : previewingId === track.id ? 'Playing…' : 'Preview clip'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCancelPending()}
                         className="rounded px-3 py-1.5 text-xs font-bold text-gray-400 border border-border/50 hover:text-white"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
-                        onClick={handleConfirmAdd}
+                        onClick={() => void handleConfirmAdd()}
                         disabled={addingId === track.id}
                         className="rounded px-4 py-1.5 text-xs font-bold uppercase bg-accent text-white hover:bg-green-400 disabled:opacity-50"
                       >

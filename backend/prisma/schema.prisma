@@ -13,6 +13,7 @@ model Party {
   status                String   @default("lobby") // lobby | playing | ended
   rating_window_seconds Int      @default(30)
   max_songs             Int      @default(20)
+  songs_per_user        Int      @default(3)
   show_scores           Boolean  @default(false)
   host_id               String?
   current_song_id       String?
@@ -24,25 +25,28 @@ model Party {
 }
 
 model User {
-  id       String   @id @default(cuid())
-  name     String
-  party_id String
-  party    Party    @relation(fields: [party_id], references: [id])
-  ratings  Rating[]
+  id                    String   @id @default(cuid())
+  name                  String
+  party_id              String
+  spotify_access_token  String?
+  spotify_refresh_token String?
+  party                 Party    @relation(fields: [party_id], references: [id])
+  ratings               Rating[]
 }
 
 model Song {
-  id            String   @id @default(cuid())
-  party_id      String
-  spotify_id    String
-  title         String
-  artist        String
-  cover_url     String
-  added_by      String
-  order         Int
-  start_time_ms Int      @default(0)
-  party         Party    @relation(fields: [party_id], references: [id])
-  ratings       Rating[]
+  id                String   @id @default(cuid())
+  party_id          String
+  spotify_id        String
+  title             String
+  artist            String
+  cover_url         String
+  added_by          String
+  added_by_user_id  String?
+  order             Int
+  start_time_ms     Int      @default(0)
+  party             Party    @relation(fields: [party_id], references: [id])
+  ratings           Rating[]
 }
 
 model Rating {
