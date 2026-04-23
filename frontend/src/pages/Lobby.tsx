@@ -116,7 +116,6 @@ export default function Lobby() {
   }
 
   const hostConnected = !!users.find((u) => u.id === party.host_id)?.spotify_connected;
-  const readyCount = users.filter((u) => u.is_ready).length;
 
   return (
     <NeroPageShell>
@@ -153,21 +152,6 @@ export default function Lobby() {
                 >
                   {currentUser.is_ready ? 'Ready ✓' : 'Ready Up'}
                 </button>
-                <p className="max-w-[14rem] text-right text-[0.65rem] leading-snug text-muted sm:text-xs">
-                  {readyCount} / {users.length} ready
-                  {!hostConnected && (
-                    <>
-                      {' '}
-                      · waiting for host to connect Spotify
-                    </>
-                  )}
-                  {songs.length === 0 && (
-                    <>
-                      {' '}
-                      · add songs before starting
-                    </>
-                  )}
-                </p>
               </motion.div>
             )}
           </div>
