@@ -155,29 +155,20 @@ export default function Lobby() {
               <div className="min-h-[120px] flex-1">
                 <UserList users={users} hostId={party.host_id} currentUserId={currentUser?.id ?? null} />
               </div>
-              <div className="mt-auto border-t border-border/30 pt-4">
-                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">Host · Spotify</p>
-                {hostConnected ? (
-                  <motion.span
-                    initial={{ opacity: 0.85 }}
-                    animate={{ opacity: [0.85, 1, 0.85] }}
-                    transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                    className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-full border border-accent/50 bg-accent/15 px-4 py-3 text-sm font-bold uppercase tracking-wide text-success shadow-[0_0_24px_rgba(34,197,94,0.45)] sm:w-auto sm:justify-start"
-                  >
-                    <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-success shadow-[0_0_8px_rgba(34,197,94,0.9)]" />
-                    Connected to Spotify
-                  </motion.span>
-                ) : isHost ? (
-                  <a
-                    href={spotifyAuthUrl}
-                    className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-full bg-[#1DB954] px-5 py-3 text-sm font-bold text-black shadow-[0_0_20px_rgba(29,185,84,0.35)] transition hover:bg-[#1ed760] sm:w-auto"
-                  >
-                    <SpotifyIcon /> Connect Spotify
-                  </a>
-                ) : (
-                  <p className="animate-pulse text-sm text-muted">Waiting for host to connect Spotify…</p>
-                )}
-              </div>
+              {!hostConnected && (
+                <div className="mt-auto border-t border-border/30 pt-4">
+                  {isHost ? (
+                    <a
+                      href={spotifyAuthUrl}
+                      className="inline-flex w-full max-w-full items-center justify-center gap-2 rounded-full bg-[#1DB954] px-5 py-3 text-sm font-bold text-black shadow-[0_0_20px_rgba(29,185,84,0.35)] transition hover:bg-[#1ed760] sm:w-auto"
+                    >
+                      <SpotifyIcon /> Connect Spotify
+                    </a>
+                  ) : (
+                    <p className="animate-pulse text-sm text-muted">Waiting for host to connect Spotify…</p>
+                  )}
+                </div>
+              )}
             </div>
           </motion.section>
 
