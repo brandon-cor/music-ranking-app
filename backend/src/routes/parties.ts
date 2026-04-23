@@ -115,12 +115,13 @@ router.post('/:id/join', async (req, res) => {
 // POST /api/parties/:id/songs — add a song to the queue (any user)
 router.post('/:id/songs', async (req, res) => {
   try {
-    const { spotify_id, title, artist, cover_url, added_by } = req.body as {
+    const { spotify_id, title, artist, cover_url, added_by, start_time_ms } = req.body as {
       spotify_id: string;
       title: string;
       artist: string;
       cover_url: string;
       added_by: string;
+      start_time_ms?: number;
     };
 
     const party = await prisma.party.findUnique({
@@ -152,6 +153,7 @@ router.post('/:id/songs', async (req, res) => {
         cover_url,
         added_by,
         order: party.songs.length,
+        start_time_ms: start_time_ms ?? 0,
       },
     });
 
@@ -199,7 +201,9 @@ router.get('/:id/results', async (req, res) => {
       })
       .sort((a, b) => {
         if (Math.abs(b.avgScore - a.avgScore) > 0.001) return b.avgScore - a.avgScore;
-        // tiebreaker: song whose ratings came in first wins
+        const aFire = a.ratings.filter((r) => r.score === 5).length;
+        const bFire = b.ratings.filter((r) => r.score === 5).length;
+        if (bFire !== aFire) return bFire - aFire;
         if (a.firstVote && b.firstVote) {
           return new Date(a.firstVote).getTime() - new Date(b.firstVote).getTime();
         }

@@ -8,10 +8,20 @@ import NowPlaying from '../components/NowPlaying';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
 import Countdown from '../components/Countdown';
-import RatingSlider from '../components/RatingSlider';
 import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import type { SpotifyPlayer } from '../types';
+import type { RatingWindowState, SpotifyPlayer } from '../types';
+
+const RATING_OPTIONS = [
+  { score: 1, emoji: '💀', label: '1 pt' },
+  { score: 3, emoji: '😮', label: '3 pt' },
+  { score: 5, emoji: '🔥', label: '5 pt' },
+] as const;
+
+function emojiForScore(score: number): string {
+  const row = RATING_OPTIONS.find((o) => o.score === score);
+  return row?.emoji ?? '✓';
+}
 
 export default function Player() {
   const { partyId } = useParams<{ partyId: string }>();
@@ -36,14 +46,14 @@ export default function Player() {
     leaveParty,
   } = useParty();
 
-  // Spotify Web Playback SDK state (host only)
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [spotifyErrorMessage, setSpotifyErrorMessage] = useState<string | null>(null);
   const playerRef = useRef<SpotifyPlayer | null>(null);
 
-  // rating slider state
-  const [sliderValue, setSliderValue] = useState(50);
   const [votedFlash, setVotedFlash] = useState(false);
+  const [lastVoteScore, setLastVoteScore] = useState<number | null>(null);
+  const [missedVote, setMissedVote] = useState(false);
+  const prevRatingWindowRef = useRef<RatingWindowState | null>(null);
 
   // restore session on refresh
   useEffect(() => {
@@ -75,6 +85,19 @@ export default function Player() {
     else if (currentUser) joinRoom(partyId, currentUser.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partyId]);
+
+  useEffect(() => {
+    const wasOpen = prevRatingWindowRef.current !== null;
+    const isOpen = ratingWindow !== null;
+    if (wasOpen && !isOpen && !hasVoted && party?.status !== 'ended') {
+      setMissedVote(true);
+      const t = window.setTimeout(() => setMissedVote(false), 2500);
+      prevRatingWindowRef.current = ratingWindow;
+      return () => window.clearTimeout(t);
+    }
+    prevRatingWindowRef.current = ratingWindow;
+    return undefined;
+  }, [ratingWindow, hasVoted, party?.status]);
 
   // initialize Spotify Web Playback SDK for the host
   useEffect(() => {
@@ -117,14 +140,12 @@ export default function Player() {
           playerRef.current = player;
         };
 
-        // SDK may already be ready if it loaded before this component mounted
         if (window.Spotify) {
           sdkReady();
         } else {
           window.onSpotifyWebPlaybackSDKReady = sdkReady;
         }
       } catch {
-        // no Spotify token — host hasn't connected Spotify yet
         console.info('No Spotify token for host — skipping SDK init');
         setSpotifyErrorMessage('Connect Spotify from the lobby before starting songs.');
       }
@@ -138,12 +159,11 @@ export default function Player() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHost, partyId]);
 
-  // play a sound when the rating window opens
   useEffect(() => {
     if (ratingWindow) {
       playRatingOpen();
-      setSliderValue(50);
       setVotedFlash(false);
+      setLastVoteScore(null);
     }
   }, [ratingWindow]);
 
@@ -158,11 +178,15 @@ export default function Player() {
       return;
     }
 
-    // unlock the browser audio context while we're still inside the click gesture
     playerRef.current?.activateElement();
 
     try {
-      await spotifyPlay(partyId, `spotify:track:${song.spotify_id}`, deviceId);
+      await spotifyPlay(
+        partyId,
+        `spotify:track:${song.spotify_id}`,
+        deviceId,
+        song.start_time_ms ?? 0,
+      );
       setSpotifyErrorMessage(null);
       emitSongPlay(songId);
     } catch (err) {
@@ -173,14 +197,14 @@ export default function Player() {
     }
   };
 
-  const handleSubmitRating = () => {
+  const handleEmojiVote = (score: number) => {
     if (!ratingWindow || hasVoted) return;
-    emitRatingSubmit(ratingWindow.songId, sliderValue);
+    emitRatingSubmit(ratingWindow.songId, score);
+    setLastVoteScore(score);
     setVotedFlash(true);
     playVoteConfirm();
   };
 
-  // which songs haven't been played yet (come after current in queue order)
   const currentOrder = currentSong?.order ?? -1;
   const nextSong = songs.find((s) => s.order === currentOrder + 1) ?? null;
 
@@ -194,26 +218,38 @@ export default function Player() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* rating window overlay */}
+      <AnimatePresence>
+        {missedVote && (
+          <motion.div
+            key="missed"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 px-6"
+          >
+            <p className="text-center text-xl font-black uppercase tracking-wide text-fiery">
+              Too slow! You missed your time.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {ratingWindow && (
           <RatingOverlay
-            songId={ratingWindow.songId}
             endsAt={ratingWindow.endsAt}
             song={songs.find((s) => s.id === ratingWindow.songId) ?? null}
-            sliderValue={sliderValue}
-            onSliderChange={setSliderValue}
             hasVoted={hasVoted}
             votedFlash={votedFlash}
+            lastVoteScore={lastVoteScore}
             voteCount={voteCount}
             totalUsers={users.length}
-            onSubmit={handleSubmitRating}
+            onEmojiVote={handleEmojiVote}
           />
         )}
       </AnimatePresence>
 
       <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
-        {/* header */}
         <div className="flex flex-col gap-3">
           <Breadcrumbs
             items={[
@@ -231,6 +267,7 @@ export default function Player() {
             {partyId && <PartyCodeEditor partyCode={partyId} />}
             {isHost && (
               <button
+                type="button"
                 onClick={emitPartyEnd}
                 className="text-xs text-gray-600 hover:text-red-400 border border-gray-800 hover:border-red-900 px-3 py-1.5 rounded-lg transition"
               >
@@ -240,7 +277,6 @@ export default function Player() {
           </div>
         </div>
 
-        {/* now playing */}
         <NowPlaying song={currentSong} />
 
         {isHost && spotifyErrorMessage && (
@@ -249,11 +285,11 @@ export default function Player() {
           </p>
         )}
 
-        {/* host controls */}
         {isHost && (
           <div className="flex flex-wrap gap-3">
             {nextSong && !ratingWindow && (
               <button
+                type="button"
                 onClick={() => handlePlaySong(nextSong.id)}
                 className="bg-gold text-black font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition text-sm"
               >
@@ -263,20 +299,11 @@ export default function Player() {
 
             {currentSong && !ratingWindow && (
               <button
+                type="button"
                 onClick={() => emitRatingOpen(currentSong.id)}
                 className="bg-fiery text-white font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-orange-500 active:scale-95 transition text-sm"
               >
                 🔥 Open Rating
-              </button>
-            )}
-
-            {/* play first song if nothing playing yet */}
-            {!currentSong && songs.length > 0 && !ratingWindow && (
-              <button
-                onClick={() => handlePlaySong(songs[0].id)}
-                className="bg-gold text-black font-black px-6 py-3 rounded-xl uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition text-sm"
-              >
-                ▶ Play Song
               </button>
             )}
 
@@ -292,13 +319,11 @@ export default function Player() {
           </div>
         )}
 
-        {/* queue */}
         <section>
           <h2 className="font-bold text-sm uppercase tracking-wide text-gray-400 mb-3">Queue</h2>
           <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
         </section>
 
-        {/* users */}
         <section>
           <h2 className="font-bold text-sm uppercase tracking-wide text-gray-400 mb-3">
             In the room ({users.length})
@@ -314,30 +339,26 @@ export default function Player() {
   );
 }
 
-// full-screen rating overlay
 interface RatingOverlayProps {
-  songId: string;
   endsAt: number;
   song: import('../types').Song | null;
-  sliderValue: number;
-  onSliderChange: (v: number) => void;
   hasVoted: boolean;
   votedFlash: boolean;
+  lastVoteScore: number | null;
   voteCount: number;
   totalUsers: number;
-  onSubmit: () => void;
+  onEmojiVote: (score: number) => void;
 }
 
 function RatingOverlay({
   endsAt,
   song,
-  sliderValue,
-  onSliderChange,
   hasVoted,
   votedFlash,
+  lastVoteScore,
   voteCount,
   totalUsers,
-  onSubmit,
+  onEmojiVote,
 }: RatingOverlayProps) {
   return (
     <motion.div
@@ -347,9 +368,7 @@ function RatingOverlay({
       transition={{ type: 'spring', damping: 22, stiffness: 200 }}
       className="fixed inset-0 z-50 bg-black flex flex-col"
     >
-      {/* top: song info + countdown */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 pt-10">
-        {/* "HOT TAKE" banner */}
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -360,7 +379,6 @@ function RatingOverlay({
           </h2>
         </motion.div>
 
-        {/* song card */}
         {song && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -380,19 +398,16 @@ function RatingOverlay({
           </motion.div>
         )}
 
-        {/* countdown */}
         <Countdown endsAt={endsAt} />
 
-        {/* vote tally */}
         <p className="text-gray-500 text-sm">
           {voteCount} / {totalUsers} voted
         </p>
       </div>
 
-      {/* bottom: slider + submit */}
       <div className="p-6 pb-10 border-t border-white/10 bg-black/50 backdrop-blur-sm">
         <AnimatePresence mode="wait">
-          {votedFlash ? (
+          {votedFlash && lastVoteScore != null ? (
             <motion.div
               key="voted"
               initial={{ scale: 0.8, opacity: 0 }}
@@ -400,37 +415,44 @@ function RatingOverlay({
               exit={{ scale: 1.2, opacity: 0 }}
               className="flex flex-col items-center gap-2 py-4"
             >
-              <span className="display-num text-6xl text-success glow-gold">
-                YOU VOTED 🔥
+              <span className="display-num text-6xl text-success glow-gold">YOU VOTED</span>
+              <span className="text-5xl" aria-hidden>
+                {emojiForScore(lastVoteScore)}
               </span>
               <span className="text-gray-400 text-sm">
-                Score: <strong className="text-white">{sliderValue}</strong> locked in
+                <strong className="text-white">{lastVoteScore}</strong> pt locked in
               </span>
             </motion.div>
           ) : (
             <motion.div
-              key="slider"
+              key="emoji-pick"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col gap-5"
             >
-              <RatingSlider
-                value={sliderValue}
-                onChange={onSliderChange}
-                disabled={hasVoted}
-              />
-
-              <button
-                onClick={onSubmit}
-                disabled={hasVoted}
-                className={`w-full py-4 rounded-xl font-black text-xl uppercase tracking-widest transition active:scale-95 ${
-                  hasVoted
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                    : 'bg-gold text-black hover:bg-yellow-400'
-                }`}
-              >
-                {hasVoted ? 'Vote Locked 🔒' : 'Submit Hot Take'}
-              </button>
+              <p className="text-center text-xs uppercase tracking-widest text-gray-500">
+                Tap one — Skull (1) · Woah (3) · Fire (5)
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {RATING_OPTIONS.map(({ score, emoji, label }) => (
+                  <button
+                    key={score}
+                    type="button"
+                    disabled={hasVoted}
+                    onClick={() => onEmojiVote(score)}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-2xl border-2 py-6 px-2 transition active:scale-95 ${
+                      hasVoted
+                        ? 'border-gray-800 bg-gray-900/50 text-gray-600 cursor-not-allowed'
+                        : 'border-white/20 bg-white/5 hover:border-gold/60 hover:bg-gold/10'
+                    }`}
+                  >
+                    <span className="text-4xl" aria-hidden>
+                      {emoji}
+                    </span>
+                    <span className="text-xs font-black uppercase text-gray-400">{label}</span>
+                  </button>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

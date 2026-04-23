@@ -169,7 +169,7 @@ export default function Podium() {
                     >
                       {song.avgScore.toFixed(1)}
                     </span>
-                    <p className="text-gray-600 text-xs">avg score</p>
+                    <p className="text-gray-600 text-xs">avg / 5</p>
                   </div>
                 </motion.div>
               );

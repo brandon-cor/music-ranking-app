@@ -131,8 +131,8 @@ export function setupSocket(io: Server) {
         const { partyId, userId } = socket.data as { partyId: string; userId: string };
         if (!partyId || !userId) return;
 
-        // clamp score to 0–100
-        const clampedScore = Math.min(100, Math.max(0, Math.round(score)));
+        // clamp score to 1–5 (emoji ratings: skull / woah / fire)
+        const clampedScore = Math.min(5, Math.max(1, Math.round(score)));
 
         try {
           const rating = await prisma.rating.upsert({
@@ -254,6 +254,9 @@ async function getPartyResults(partyId: string, userCount: number) {
     })
     .sort((a, b) => {
       if (Math.abs(b.avgScore - a.avgScore) > 0.01) return b.avgScore - a.avgScore;
+      const aFire = a.ratings.filter((r) => r.score === 5).length;
+      const bFire = b.ratings.filter((r) => r.score === 5).length;
+      if (bFire !== aFire) return bFire - aFire;
       if (a.firstVote && b.firstVote) {
         return new Date(a.firstVote).getTime() - new Date(b.firstVote).getTime();
       }

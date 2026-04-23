@@ -52,6 +52,7 @@ export async function addSong(
   partyId: string,
   track: SpotifyTrack,
   addedBy: string,
+  startTimeMs = 0,
 ): Promise<{ song: Song }> {
   return request(`/parties/${partyId}/songs`, {
     method: 'POST',
@@ -61,6 +62,7 @@ export async function addSong(
       artist: track.artists.map((a) => a.name).join(', '),
       cover_url: track.album.images[0]?.url ?? '',
       added_by: addedBy,
+      start_time_ms: startTimeMs,
     }),
   });
 }
@@ -82,9 +84,14 @@ export async function searchSpotify(
   return request(`/spotify/search?partyId=${encodeURIComponent(partyId)}&q=${encodeURIComponent(q)}`);
 }
 
-export async function spotifyPlay(partyId: string, spotifyUri: string, deviceId: string) {
+export async function spotifyPlay(
+  partyId: string,
+  spotifyUri: string,
+  deviceId: string,
+  positionMs = 0,
+) {
   return request('/spotify/play', {
     method: 'POST',
-    body: JSON.stringify({ partyId, spotifyUri, deviceId }),
+    body: JSON.stringify({ partyId, spotifyUri, deviceId, positionMs }),
   });
 }
