@@ -7,7 +7,6 @@ import { NeroPageShell } from '../components/NeroPageShell';
 import { useParty } from '../context/PartyContext';
 import { getResults } from '../lib/api';
 import { playDrumRoll, playVerdictReveal } from '../lib/audio';
-import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import type { SongResult } from '../types';
 
 type RevealPhase = 'idle' | 'drum_roll' | 'revealed';
@@ -68,7 +67,7 @@ function PodiumBlock({ song, rank, heightClass, delay }: PodiumBlockProps) {
       className={`flex w-[min(28vw,160px)] flex-col sm:w-40 md:w-44 ${heightClass}`}
     >
       <div
-        className={`flex min-h-0 flex-1 flex-col items-center justify-end gap-2 rounded-t-2xl border border-border/50 bg-card/70 px-2 pb-3 pt-4 backdrop-blur-sm ${
+        className={`flex min-h-0 flex-1 flex-col items-center justify-start gap-2 rounded-t-2xl border border-border/50 bg-card/70 px-2 pb-3 pt-4 backdrop-blur-sm ${
           isFirst ? 'border-accent/40 shadow-accent-glow-lg ring-1 ring-accent/20' : ''
         }`}
       >
@@ -228,7 +227,15 @@ export default function Podium() {
           <h1 className="display-num text-[clamp(40px,10vw,80px)] leading-none text-white">
             THE VERDICT
           </h1>
-          {partyId && <PartyCodeEditor partyCode={partyId} className="mt-3 justify-center" />}
+          <div className="mt-3 flex justify-center">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="rounded-full border border-border/50 bg-card/60 px-8 py-3 text-sm font-semibold text-white transition hover:bg-card"
+            >
+              Host Another Party
+            </button>
+          </div>
         </motion.div>
 
         {phase === 'idle' && (
@@ -312,7 +319,7 @@ export default function Podium() {
                 Top 3
               </p>
               <div
-                className={`flex min-h-0 items-end justify-center gap-2 sm:gap-4 md:gap-6 ${
+                className={`flex min-h-0 items-start justify-center gap-2 sm:gap-4 md:gap-6 ${
                   rest.length > 0 ? 'lg:col-start-1 lg:row-start-2' : ''
                 }`}
               >
@@ -344,13 +351,6 @@ export default function Podium() {
               className="flex shrink-0 flex-col items-center border-t border-border/30 pt-6"
             >
               <p className="display-num text-2xl text-accent sm:text-3xl">That&apos;s a wrap!</p>
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className="mt-4 rounded-full border border-border/50 bg-card/60 px-8 py-3 text-sm font-semibold text-white transition hover:bg-card"
-              >
-                Host Another Party
-              </button>
             </motion.div>
           </motion.div>
         )}
