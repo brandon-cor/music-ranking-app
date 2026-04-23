@@ -36,6 +36,8 @@ export interface IPodPlayerProps {
   /** End the rating window early (host only, while rating is open). */
   onSkipRating?: () => void;
   showSkip?: boolean;
+  /** Stretch to parent height and grow the art area (live Player middle column). */
+  fillHeight?: boolean;
 }
 
 export function IPodPlayer({
@@ -45,6 +47,7 @@ export function IPodPlayer({
   onReplayClip,
   onSkipRating,
   showSkip = false,
+  fillHeight = false,
 }: IPodPlayerProps) {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -104,12 +107,28 @@ export function IPodPlayer({
 
   return (
     <div
-      className="rounded-[28px] bg-gradient-to-b from-zinc-300 to-zinc-500 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_20px_40px_rgba(0,0,0,0.35)]"
+      className={`rounded-[28px] bg-gradient-to-b from-zinc-300 to-zinc-500 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_20px_40px_rgba(0,0,0,0.35)] ${
+        fillHeight ? 'flex h-full min-h-[320px] flex-col' : ''
+      }`}
       data-testid="ipod-player"
     >
-      <div className="overflow-hidden rounded-2xl bg-zinc-900 p-3 shadow-inner sm:p-4">
-        <div className="flex min-h-[4.5rem] items-stretch gap-2 sm:gap-3 sm:min-h-[5.5rem]">
-          <div className="flex min-w-0 flex-1 flex-col justify-center text-left text-white">
+      <div
+        className={`overflow-hidden rounded-2xl bg-zinc-900 p-3 shadow-inner sm:p-4 ${
+          fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''
+        }`}
+      >
+        <div
+          className={`flex items-stretch gap-2 sm:gap-3 ${
+            fillHeight
+              ? 'min-h-0 flex-1 flex-col sm:flex-row sm:items-center'
+              : 'min-h-[4.5rem] sm:min-h-[5.5rem]'
+          }`}
+        >
+          <div
+            className={`flex min-w-0 flex-col justify-center text-left text-white ${
+              fillHeight ? 'shrink-0 sm:flex-1' : 'flex-1'
+            }`}
+          >
             {song ? (
               <>
                 <p className="truncate text-sm font-bold leading-tight sm:text-base">{song.title}</p>
@@ -119,7 +138,13 @@ export function IPodPlayer({
               <p className="text-sm text-zinc-500">No song playing</p>
             )}
           </div>
-          <div className="relative h-16 w-16 shrink-0 sm:h-20 sm:w-20">
+          <div
+            className={`relative shrink-0 ${
+              fillHeight
+                ? 'mx-auto mt-3 aspect-square h-[min(18rem,calc(100%-1rem))] max-h-72 w-[min(18rem,calc(100%-1rem))] max-w-full sm:mx-0 sm:mt-0 sm:h-[min(20rem,45vh)] sm:w-[min(20rem,45vh)]'
+                : 'h-16 w-16 sm:h-20 sm:w-20'
+            }`}
+          >
             {song ? (
               <img src={song.cover_url} alt="" className="h-full w-full rounded-lg object-cover shadow-md" />
             ) : (
@@ -133,7 +158,7 @@ export function IPodPlayer({
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className={`${fillHeight ? 'mt-4 shrink-0' : 'mt-3'}`}>
           <div
             className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800"
             role="progressbar"
@@ -156,7 +181,7 @@ export function IPodPlayer({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-center gap-4 sm:gap-6">
+      <div className={`flex items-center justify-center gap-4 sm:gap-6 ${fillHeight ? 'mt-5 shrink-0' : 'mt-5'}`}>
         <button
           type="button"
           disabled={!canReplay}

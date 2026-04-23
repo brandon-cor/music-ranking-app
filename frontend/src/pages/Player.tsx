@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NeroPageShell } from '../components/NeroPageShell';
@@ -27,6 +27,7 @@ export default function Player() {
     currentSong,
     ratingWindow,
     hasVoted,
+    votedUserIds,
     isHost,
     setParty,
     setCurrentUser,
@@ -250,6 +251,12 @@ export default function Player() {
     setCelebrationScore(normalized);
   };
 
+  const displayedVotedUserIds = useMemo(() => {
+    const set = new Set(votedUserIds);
+    if (hasVoted && currentUser?.id) set.add(currentUser.id);
+    return Array.from(set);
+  }, [votedUserIds, hasVoted, currentUser?.id]);
+
   if (!party) {
     return (
       <NeroPageShell>
@@ -304,20 +311,20 @@ export default function Player() {
               ]}
             />
 
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-accent">Live</p>
                 <h1 className="display-num text-3xl text-white">{party.name}</h1>
               </div>
-              {isHost && (
-                <button
-                  type="button"
-                  onClick={emitPartyEnd}
-                  className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted transition hover:border-red-900/60 hover:text-red-400"
-                >
-                  End Party
-                </button>
-              )}
+              <div className="ml-auto shrink-0 pt-1">
+                {ratingWindow && (
+                  <CircleCountdown
+                    endsAt={ratingWindow.endsAt}
+                    durationMs={ratingWindow.duration * 1000}
+                    size={104}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -327,49 +334,8 @@ export default function Player() {
             </p>
           )}
 
-          {isHost && (
-            <div className="flex flex-wrap items-center gap-3">
-              {deviceId ? (
-                <span className="flex items-center gap-1.5 text-xs text-success">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success" /> Spotify connected
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-xs text-muted">
-                  <span className="h-1.5 w-1.5 rounded-full bg-border" /> Spotify not connected
-                </span>
-              )}
-            </div>
-          )}
-
-          <div className="grid gap-6 lg:grid-cols-[minmax(300px,420px)_1fr]">
-            <div className="flex flex-col items-center gap-5 lg:items-stretch">
-              <IPodPlayer
-                song={currentSong}
-                isHost={isHost}
-                player={playerInstance}
-                onReplayClip={isHost ? () => void handleReplayClip() : undefined}
-                onSkipRating={isHost ? emitSongSkip : undefined}
-                showSkip={!!ratingWindow}
-              />
-              {ratingWindow && (
-                <div className="flex justify-center lg:justify-center">
-                  <CircleCountdown
-                    endsAt={ratingWindow.endsAt}
-                    durationMs={ratingWindow.duration * 1000}
-                    size={152}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="grid min-w-0 gap-6 md:grid-cols-3">
-              <RatingPanel ratingWindow={ratingWindow} hasVoted={hasVoted} onEmojiVote={handleEmojiVote} />
-
-              <section className="min-w-0">
-                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
-                <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
-              </section>
-
+          <div className="grid min-h-0 gap-6 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(180px,240px)] lg:items-stretch lg:min-h-[min(560px,calc(100vh-12rem))]">
+            <div className="flex min-h-0 flex-col gap-6">
               <section className="min-w-0">
                 <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
                   In the room ({users.length})
@@ -378,8 +344,29 @@ export default function Player() {
                   users={users}
                   hostId={party.host_id}
                   currentUserId={currentUser?.id ?? null}
+                  votedUserIds={displayedVotedUserIds}
                 />
               </section>
+              <section className="min-w-0">
+                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">Queue</h2>
+                <Queue songs={songs} currentSongId={currentSong?.id ?? null} />
+              </section>
+            </div>
+
+            <div className="flex min-h-0 min-w-0 flex-col justify-stretch">
+              <IPodPlayer
+                song={currentSong}
+                isHost={isHost}
+                player={playerInstance}
+                onReplayClip={isHost ? () => void handleReplayClip() : undefined}
+                onSkipRating={isHost ? emitSongSkip : undefined}
+                showSkip={!!ratingWindow}
+                fillHeight
+              />
+            </div>
+
+            <div className="flex min-h-0 min-w-0 flex-col">
+              <RatingPanel ratingWindow={ratingWindow} hasVoted={hasVoted} onEmojiVote={handleEmojiVote} />
             </div>
           </div>
         </div>

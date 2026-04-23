@@ -1,4 +1,4 @@
-// Rate panel: stacked emoji votes (1 / 3 / 5 pt); clip countdown lives next to the iPod on Player.
+// Rate panel: free-floating emoji votes (1 / 3 / 5 pt); no card chrome
 import { motion } from 'framer-motion';
 import type { RatingWindowState } from '../types';
 import { RATING_OPTIONS } from '../lib/ratingOptions';
@@ -10,34 +10,25 @@ export interface RatingPanelProps {
 }
 
 export function RatingPanel({ ratingWindow, hasVoted, onEmojiVote }: RatingPanelProps) {
-  if (!ratingWindow) {
-    return (
-      <section className="flex min-h-[12rem] flex-col rounded-2xl border border-border/30 bg-card/40 p-4">
-        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">Rate</h2>
-        <p className="mt-auto text-sm text-muted/90">Ratings open as soon as the clip starts.</p>
-      </section>
-    );
-  }
+  const active = ratingWindow !== null;
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-border/30 bg-card/50 p-4">
-      <div className="flex flex-col gap-2">
-        {RATING_OPTIONS.map(({ score, emoji }) => (
-          <motion.button
-            key={score}
-            type="button"
-            disabled={hasVoted}
-            onClick={() => onEmojiVote(score)}
-            whileTap={hasVoted ? undefined : { scale: 0.92 }}
-            className={`flex min-h-[4.5rem] items-center justify-center text-5xl transition active:scale-95 ${
-              hasVoted ? 'cursor-default opacity-45' : ''
-            }`}
-            aria-label={`Vote ${score} points`}
-          >
-            <span aria-hidden>{emoji}</span>
-          </motion.button>
-        ))}
-      </div>
-    </section>
+    <div className="flex h-full min-h-[14rem] flex-col items-center justify-around gap-8 py-2 sm:gap-10 sm:py-4">
+      {RATING_OPTIONS.map(({ score, emoji }) => (
+        <motion.button
+          key={score}
+          type="button"
+          disabled={hasVoted || !active}
+          onClick={() => onEmojiVote(score)}
+          whileTap={hasVoted || !active ? undefined : { scale: 0.92 }}
+          className={`text-6xl leading-none transition sm:text-7xl ${
+            !active ? 'cursor-default opacity-30' : ''
+          } ${hasVoted ? 'cursor-default opacity-45' : active ? 'hover:opacity-90' : ''}`}
+          aria-label={`Vote ${score} points`}
+        >
+          <span aria-hidden>{emoji}</span>
+        </motion.button>
+      ))}
+    </div>
   );
 }

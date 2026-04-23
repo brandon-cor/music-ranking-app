@@ -221,9 +221,14 @@ export function setupSocket(io: Server) {
           // only the submitter gets the confirmation
           socket.emit('rating:confirmed', { rating });
 
-          // broadcast vote count so everyone can see the tally
-          const voteCount = await prisma.rating.count({ where: { song_id: songId } });
-          io.to(`party:${partyId}`).emit('rating:tally', { songId, voteCount });
+          // broadcast vote count and who has voted so clients can show per-user checks
+          const ratingsRows = await prisma.rating.findMany({
+            where: { song_id: songId },
+            select: { user_id: true },
+          });
+          const voteCount = ratingsRows.length;
+          const votedUserIds = ratingsRows.map((r) => r.user_id);
+          io.to(`party:${partyId}`).emit('rating:tally', { songId, voteCount, votedUserIds });
 
           const partyFull = await prisma.party.findUnique({
             where: { id: partyId },

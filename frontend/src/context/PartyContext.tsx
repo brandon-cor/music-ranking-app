@@ -26,6 +26,8 @@ interface PartyContextValue {
   ratingWindow: RatingWindowState | null;
   hasVoted: boolean;
   voteCount: number;
+  /** User ids who submitted a rating for the current song (from server tally). */
+  votedUserIds: string[];
   results: SongResult[];
   isHost: boolean;
   // actions
@@ -58,6 +60,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
   const [ratingWindow, setRatingWindow] = useState<RatingWindowState | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [voteCount, setVoteCount] = useState(0);
+  const [votedUserIds, setVotedUserIds] = useState<string[]>([]);
   const [results, setResults] = useState<SongResult[]>([]);
 
   // track the current song id so event handlers always read fresh value
@@ -89,6 +92,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     setRatingWindow(null);
     setHasVoted(false);
     setVoteCount(0);
+    setVotedUserIds([]);
     setResults([]);
     if (reasonKey && PARTY_CLOSED_REASONS[reasonKey]) {
       // a queryParam keeps things shareable / refreshable without state drama
@@ -109,6 +113,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
   function emitRatingOpen(songId: string) {
     setHasVoted(false);
     setVoteCount(0);
+    setVotedUserIds([]);
     socket.emit('rating:open', { songId });
   }
 
@@ -179,6 +184,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       setRatingWindow(null);
       setHasVoted(false);
       setVoteCount(0);
+      setVotedUserIds([]);
     });
 
     socket.on(
@@ -187,6 +193,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
         setRatingWindow({ songId, endsAt, duration });
         setHasVoted(false);
         setVoteCount(0);
+        setVotedUserIds([]);
       },
     );
 
@@ -194,17 +201,29 @@ export function PartyProvider({ children }: { children: ReactNode }) {
       setHasVoted(true);
     });
 
-    socket.on('rating:tally', ({ voteCount: vc }: { voteCount: number }) => {
-      setVoteCount(vc);
-    });
+    socket.on(
+      'rating:tally',
+      ({
+        voteCount: vc,
+        votedUserIds: ids,
+      }: {
+        voteCount: number;
+        votedUserIds?: string[];
+      }) => {
+        setVoteCount(vc);
+        if (ids) setVotedUserIds(ids);
+      },
+    );
 
     socket.on('rating:close', () => {
       setRatingWindow(null);
+      setVotedUserIds([]);
     });
 
     socket.on('party:end', ({ results: r }: { results: SongResult[] }) => {
       setResults(r);
       setRatingWindow(null);
+      setVotedUserIds([]);
       setPartyState((prev) => (prev ? { ...prev, status: 'ended' } : prev));
       // navigate everyone to the podium
       if (party?.id) navigate(`/party/${party.id}/podium`);
@@ -247,6 +266,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     ratingWindow,
     hasVoted,
     voteCount,
+    votedUserIds,
     results,
     isHost,
     setParty,

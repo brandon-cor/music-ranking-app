@@ -4,6 +4,8 @@ interface UserListProps {
   users: User[];
   hostId: string | null;
   currentUserId: string | null;
+  /** When set, users in this list get a check mark (e.g. voted on current song). */
+  votedUserIds?: string[];
 }
 
 const COLORS = [
@@ -23,7 +25,7 @@ function avatarColor(userId: string): string {
   return COLORS[hash % COLORS.length];
 }
 
-export default function UserList({ users, hostId, currentUserId }: UserListProps) {
+export default function UserList({ users, hostId, currentUserId, votedUserIds }: UserListProps) {
   return (
     <div className="flex flex-wrap gap-2">
       {users.map((user) => (
@@ -43,6 +45,11 @@ export default function UserList({ users, hostId, currentUserId }: UserListProps
             )}
             {user.id === currentUserId && (
               <span className="ml-1 text-gray-500 text-xs">(you)</span>
+            )}
+            {votedUserIds?.includes(user.id) && (
+              <span className="ml-1 text-xs text-success" aria-label="Voted">
+                ✓
+              </span>
             )}
           </span>
         </div>
