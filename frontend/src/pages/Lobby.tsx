@@ -174,13 +174,13 @@ export default function Lobby() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="flex min-h-[280px] flex-col rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
+            className="flex min-h-[280px] flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:h-[min(480px,calc(100vh-14rem))] lg:min-h-0"
           >
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
               In the room ({users.length})
             </h2>
             <div className="flex min-h-0 flex-1 flex-col gap-4">
-              <div className="min-h-[120px] flex-1">
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                 <UserList users={users} hostId={party.host_id} currentUserId={currentUser?.id ?? null} />
               </div>
               {(isHost || !hostConnected) && (
@@ -243,7 +243,7 @@ export default function Lobby() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 }}
-              className="relative z-0 flex min-h-[280px] flex-col rounded-b-2xl rounded-tr-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
+              className="relative z-0 flex min-h-[280px] flex-col overflow-hidden rounded-b-2xl rounded-tr-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:h-[min(480px,calc(100vh-14rem))] lg:min-h-0"
             >
               {activeTab === 'search' && (
                 <div
