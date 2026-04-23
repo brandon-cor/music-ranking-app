@@ -260,23 +260,7 @@ export default function Podium() {
               exit={{ opacity: 0 }}
               className="flex flex-1 flex-col items-center justify-center py-12"
             >
-              <motion.p
-                className="display-num text-3xl uppercase tracking-[0.2em] text-white sm:text-4xl"
-                animate={{
-                  scale: [1, 1.04, 1, 1.06, 1],
-                  textShadow: [
-                    '0 0 0px rgba(34,197,94,0)',
-                    '0 0 24px rgba(34,197,94,0.5)',
-                    '0 0 0px rgba(34,197,94,0)',
-                    '0 0 32px rgba(34,197,94,0.6)',
-                    '0 0 0px rgba(34,197,94,0)',
-                  ],
-                }}
-                transition={{ duration: 0.45, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                Drum roll…
-              </motion.p>
-              <div className="mt-8 flex gap-2" aria-hidden>
+              <div className="flex gap-2" aria-hidden>
                 {[0, 1, 2, 3, 4].map((i) => (
                   <motion.span
                     key={i}
