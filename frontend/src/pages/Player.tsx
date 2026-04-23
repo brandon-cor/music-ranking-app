@@ -8,11 +8,11 @@ import { useUserSpotifyPlayer } from '../lib/spotify-sdk';
 import { playRatingOpen } from '../lib/audio';
 import { IPodPlayer } from '../components/IPodPlayer';
 import { RatingPanel } from '../components/RatingPanel';
+import { CircleCountdown } from '../components/CircleCountdown';
 import { VoteCelebration, type CelebrationScore } from '../components/VoteCelebration';
 import StartCountdown from '../components/StartCountdown';
 import Queue from '../components/Queue';
 import UserList from '../components/UserList';
-import { PartyCodeEditor } from '../components/PartyCodeEditor';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import type { RatingWindowState, User } from '../types';
 
@@ -32,7 +32,6 @@ export default function Player() {
     setCurrentUser,
     joinRoom,
     emitSongPlay,
-    emitRatingOpen,
     emitRatingSubmit,
     emitSongSkip,
     emitPartyEnd,
@@ -149,7 +148,7 @@ export default function Player() {
         console.warn('Spotify auto-play failed:', err);
         autoPlayLaunchedRef.current = false;
         setLocalPlayError(
-          'Could not start Spotify playback. Open Spotify on the host browser, then tap Play Song.',
+          'Could not start Spotify playback. Open Spotify on the host browser and try again.',
         );
       }
     })();
@@ -226,6 +225,12 @@ export default function Player() {
 
     if (!justClosed || !isHost || !currentSong) return;
 
+    try {
+      void playerRef.current?.pause();
+    } catch {
+      /* Spotify SDK may throw if not ready */
+    }
+
     const next = songs.find((s) => s.order === currentSong.order + 1) ?? null;
     const t = window.setTimeout(() => {
       if (!next) {
@@ -236,7 +241,7 @@ export default function Player() {
     }, 0);
 
     return () => window.clearTimeout(t);
-  }, [ratingWindow, currentSong, isHost, songs, emitPartyEnd]);
+  }, [ratingWindow, currentSong, isHost, songs, emitPartyEnd, playerRef]);
 
   const handleEmojiVote = (score: number) => {
     if (!ratingWindow || hasVoted) return;
@@ -244,9 +249,6 @@ export default function Player() {
     emitRatingSubmit(ratingWindow.songId, normalized);
     setCelebrationScore(normalized);
   };
-
-  const currentOrder = currentSong?.order ?? -1;
-  const nextSong = songs.find((s) => s.order === currentOrder + 1) ?? null;
 
   if (!party) {
     return (
@@ -302,7 +304,6 @@ export default function Player() {
                 <p className="text-xs font-bold uppercase tracking-widest text-accent">Live</p>
                 <h1 className="display-num text-3xl text-white">{party.name}</h1>
               </div>
-              {partyId && <PartyCodeEditor partyCode={partyId} />}
               {isHost && (
                 <button
                   type="button"
@@ -323,26 +324,6 @@ export default function Player() {
 
           {isHost && (
             <div className="flex flex-wrap items-center gap-3">
-              {nextSong && !ratingWindow && (
-                <button
-                  type="button"
-                  onClick={() => handlePlaySong(nextSong.id)}
-                  className="btn-nero-cta-fill px-6 py-2.5 text-sm font-bold uppercase tracking-wide"
-                >
-                  Play Song
-                </button>
-              )}
-
-              {currentSong && !ratingWindow && (
-                <button
-                  type="button"
-                  onClick={() => emitRatingOpen(currentSong.id)}
-                  className="rounded-full bg-fiery px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-orange-500 active:scale-95"
-                >
-                  Open Rating
-                </button>
-              )}
-
               {deviceId ? (
                 <span className="flex items-center gap-1.5 text-xs text-success">
                   <span className="h-1.5 w-1.5 rounded-full bg-success" /> Spotify connected
@@ -356,14 +337,25 @@ export default function Player() {
           )}
 
           <div className="grid gap-6 lg:grid-cols-[minmax(300px,420px)_1fr]">
-            <IPodPlayer
-              song={currentSong}
-              isHost={isHost}
-              player={playerInstance}
-              onReplayClip={isHost ? () => void handleReplayClip() : undefined}
-              onSkipRating={isHost ? emitSongSkip : undefined}
-              showSkip={!!ratingWindow}
-            />
+            <div className="flex flex-col items-center gap-5 lg:items-stretch">
+              <IPodPlayer
+                song={currentSong}
+                isHost={isHost}
+                player={playerInstance}
+                onReplayClip={isHost ? () => void handleReplayClip() : undefined}
+                onSkipRating={isHost ? emitSongSkip : undefined}
+                showSkip={!!ratingWindow}
+              />
+              {ratingWindow && (
+                <div className="flex justify-center lg:justify-center">
+                  <CircleCountdown
+                    endsAt={ratingWindow.endsAt}
+                    durationMs={ratingWindow.duration * 1000}
+                    size={152}
+                  />
+                </div>
+              )}
+            </div>
 
             <div className="grid min-w-0 gap-6 md:grid-cols-3">
               <RatingPanel ratingWindow={ratingWindow} hasVoted={hasVoted} onEmojiVote={handleEmojiVote} />

@@ -18,6 +18,33 @@ function clearRatingTimer(partyId: string) {
   ratingTimers.delete(partyId);
 }
 
+/** Opens the rating window and starts the server-side timer for this song. */
+function openRatingWindow(
+  io: Server,
+  partyId: string,
+  songId: string,
+  durationSec: number,
+  showScores: boolean,
+) {
+  ratingFinalizedKeys.delete(`${partyId}:${songId}`);
+  clearRatingTimer(partyId);
+
+  const durationMs = durationSec * 1000;
+  const endsAt = Date.now() + durationMs;
+
+  io.to(`party:${partyId}`).emit('rating:open', {
+    songId,
+    endsAt,
+    duration: durationSec,
+  });
+
+  const timer = setTimeout(() => {
+    void finalizeRatingWindow(io, partyId, songId, showScores);
+  }, durationMs);
+
+  ratingTimers.set(partyId, timer);
+}
+
 /** Ends the rating window for one song: clears timer, emits rating:close once per song. */
 async function finalizeRatingWindow(
   io: Server,
@@ -131,9 +158,17 @@ export function setupSocket(io: Server) {
 
       // broadcast to everyone in the room (including the host)
       io.to(`party:${partyId}`).emit('song:play', { song });
+
+      openRatingWindow(
+        io,
+        partyId,
+        songId,
+        party.rating_window_seconds,
+        party.show_scores,
+      );
     });
 
-    // rating:open — host opens the rating window; server owns the timer
+    // rating:open — host can still open manually; server owns the timer (same as auto-open)
     socket.on('rating:open', async ({ songId }: { songId: string }) => {
       const { partyId, userId } = socket.data as { partyId: string; userId: string };
       if (!partyId || !userId) return;
@@ -141,23 +176,13 @@ export function setupSocket(io: Server) {
       const party = await prisma.party.findUnique({ where: { id: partyId } });
       if (!party || party.host_id !== userId) return;
 
-      ratingFinalizedKeys.delete(`${partyId}:${songId}`);
-      clearRatingTimer(partyId);
-
-      const durationMs = party.rating_window_seconds * 1000;
-      const endsAt = Date.now() + durationMs;
-
-      io.to(`party:${partyId}`).emit('rating:open', {
+      openRatingWindow(
+        io,
+        partyId,
         songId,
-        endsAt,
-        duration: party.rating_window_seconds,
-      });
-
-      const timer = setTimeout(() => {
-        void finalizeRatingWindow(io, partyId, songId, party.show_scores);
-      }, durationMs);
-
-      ratingTimers.set(partyId, timer);
+        party.rating_window_seconds,
+        party.show_scores,
+      );
     });
 
     // song:skip — host ends the rating window early (same payload as timer close)
