@@ -39,6 +39,7 @@ export default function Player() {
     emitSongResume,
     ratingPausedRemainingMs,
     emitPartyEnd,
+    emitPartyAbandon,
     leaveParty,
   } = useParty();
 
@@ -49,6 +50,11 @@ export default function Player() {
   const [showStartCountdown, setShowStartCountdown] = useState(false);
   const [introDone, setIntroDone] = useState(false);
   const autoPlayLaunchedRef = useRef(false);
+  // true while a page refresh/close is in progress — distinguishes unload from React navigation
+  const isPageUnloadRef = useRef(false);
+  // stable ref to isHost so the cleanup closure always reads the latest value
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
 
   const spotifyErrorMessage = localPlayError || sdkSpotifyError;
 
@@ -92,6 +98,24 @@ export default function Player() {
     else if (currentUser) joinRoom(partyId, currentUser.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partyId]);
+
+  // Mark page-unload (refresh / tab-close) so the abandon cleanup can skip those cases.
+  useEffect(() => {
+    const onBeforeUnload = () => { isPageUnloadRef.current = true; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
+  // When the host navigates away from /play via React Router (not a refresh/close),
+  // immediately end the session for all guests.
+  useEffect(() => {
+    return () => {
+      if (isHostRef.current && !isPageUnloadRef.current) {
+        emitPartyAbandon();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const wasOpen = prevRatingWindowRef.current !== null;

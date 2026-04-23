@@ -44,6 +44,8 @@ interface PartyContextValue {
   emitSongPause: () => void;
   emitSongResume: () => void;
   emitPartyEnd: () => void;
+  /** Host navigated away from /play — ends session immediately for all guests. */
+  emitPartyAbandon: () => void;
   addSongToList: (song: Song) => void;
   emitUserReady: (ready: boolean) => void;
   leaveParty: (reasonKey?: string) => void;
@@ -144,6 +146,10 @@ export function PartyProvider({ children }: { children: ReactNode }) {
 
   function emitPartyEnd() {
     socket.emit('party:end');
+  }
+
+  function emitPartyAbandon() {
+    socket.emit('party:abandon');
   }
 
   function emitUserReady(ready: boolean) {
@@ -330,6 +336,7 @@ export function PartyProvider({ children }: { children: ReactNode }) {
     emitSongPause,
     emitSongResume,
     emitPartyEnd,
+    emitPartyAbandon,
     addSongToList,
     emitUserReady,
     leaveParty,

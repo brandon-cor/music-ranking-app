@@ -411,6 +411,24 @@ export function setupSocket(io: Server) {
       },
     );
 
+    // party:abandon — host navigated away from /play without formally ending the party.
+    // Ends the session immediately and notifies all guests (but not the departing host socket).
+    socket.on('party:abandon', async () => {
+      const { partyId, userId } = socket.data as { partyId: string; userId: string };
+      if (!partyId || !userId) return;
+
+      const party = await prisma.party.findUnique({ where: { id: partyId } });
+      if (!party || party.host_id !== userId) return;
+
+      clearRatingTimer(partyId);
+      clearPausedRating(partyId);
+
+      await prisma.party.update({ where: { id: partyId }, data: { status: 'ended' } });
+
+      // broadcast only to guests — the host is already leaving
+      socket.to(`party:${partyId}`).emit('party:closed', { reason: 'host_left' });
+    });
+
     // party:end — host ends the party and triggers the podium reveal
     socket.on('party:end', async () => {
       const { partyId, userId } = socket.data as { partyId: string; userId: string };
