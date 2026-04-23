@@ -192,12 +192,21 @@ export default function Lobby() {
             transition={{ delay: 0.15 }}
             className="flex min-h-[280px] flex-col rounded-2xl border border-border/40 bg-card/80 p-5 backdrop-blur-sm lg:min-h-[min(480px,calc(100vh-14rem))]"
           >
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide">
-              Add songs{' '}
-              <span className="font-normal text-muted">
-                ({party.songs_per_user} per person · {party.songs_per_user * users.length} total)
-              </span>
-            </h2>
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h2 className="text-sm font-bold uppercase tracking-wide">
+                Add songs{' '}
+                <span className="font-normal text-muted">
+                  ({party.songs_per_user} per person · {party.songs_per_user * users.length} total)
+                </span>
+              </h2>
+              <p className="text-xs text-muted">
+                Your picks:{' '}
+                <strong className="text-white">
+                  {songs.filter((s) => s.added_by_user_id === currentUser?.id).length}
+                </strong>{' '}
+                / {party.songs_per_user}
+              </p>
+            </div>
 
             <div className="min-h-0 flex-1">
               <SongSearch partyId={party.id} />

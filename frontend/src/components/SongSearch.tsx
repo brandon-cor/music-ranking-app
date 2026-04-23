@@ -113,10 +113,6 @@ export default function SongSearch({ partyId }: SongSearchProps) {
         )}
       </div>
 
-      <p className="text-xs text-muted">
-        Your picks: <strong className="text-white">{picksUsed}</strong> / {picksCap}
-      </p>
-
       {error && <p className="text-red-400 text-xs">{error}</p>}
 
       {results.length > 0 && (
