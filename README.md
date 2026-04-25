@@ -1,11 +1,9 @@
-# Nero Party
-
 A real-time song-rating party app. The host queues tracks from Spotify, guests join by party code, and everyone scores each song during a shared rating window. At the end, the scores are revealed podium-style.
 
 ## Stack
 
 - **Backend**: Node.js, Express, Socket.IO, Prisma (SQLite), TypeScript
-- **Frontend**: React, Vite, Tailwind CSS, Framer Motion, TypeScript (UI aligned with [nero.fan](https://www.nero.fan/): Aileron, charcoal surfaces, green accent `#22c55e`, pill nav + CTA)
+- **Frontend**: React, Vite, Tailwind CSS, Framer Motion, TypeScript
 - **Auth / Playback**: Spotify OAuth + Spotify Web Playback SDK (host needs Spotify Premium)
 
 ## Running locally
